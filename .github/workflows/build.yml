@@ -16,9 +16,13 @@ on:
         default: "AU,US"
         required: false
       fundamentals_full:
-        description: "Fetch every missing fundamental now (slow, may hit Yahoo limits)"
+        description: "Fetch every missing or out-of-date company's financials (no 600/800 cap)"
         type: boolean
         default: false
+      fund_minutes:
+        description: "Minutes per market for fetching financials (40 normally; up to 300 for a catch-up)"
+        default: "40"
+        required: false
 
 permissions:
   contents: read
@@ -32,7 +36,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 340
     outputs:
       skip: ${{ steps.gate.outputs.skip }}
     steps:
@@ -73,9 +77,10 @@ jobs:
           SEC_CONTACT: ${{ secrets.SEC_CONTACT }}
           MARKETS: ${{ (github.event.schedule == '0 6 * * 1-5' || github.event.schedule == '0 7 * * 1-5') && 'AU' || github.event.schedule == '17 22 * * 0-4' && 'US' || inputs.markets || 'AU,US' }}
           FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
+          FUND_MINUTES: ${{ inputs.fund_minutes || '40' }}
         # Gentle mode: one company at a time, pauses between, backs off when Yahoo pushes back,
         # and spends at most 40 minutes per market on company financials.
-        run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled --fund-minutes 40 --fund-delay 2
+        run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled --fund-minutes "$FUND_MINUTES" --fund-delay 2
 
       - name: Save data for the next run
         if: always() && steps.gate.outputs.skip != 'true'
