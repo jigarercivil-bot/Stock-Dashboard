@@ -27,7 +27,7 @@ in the filters.
 `.github/workflows/build.yml` runs `asx_dashboard.py` at 9:17am Sydney time, Tuesday to
 Saturday, which picks up the previous trading day's close on both markets. Company
 financials are cached between runs (each run fetches up to 600 ASX and 800 US companies),
-so the Value finder's coverage fills in over the first week.
+so the Value finder's coverage fills in over the first one to two weeks. On GitHub the financials are fetched gently (one company at a time, at most 40 minutes per market) to stay under Yahoo's limits.
 
 To run it now: **Actions → Build Stock Dashboard → Run workflow**.
 

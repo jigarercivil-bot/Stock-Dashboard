@@ -28,7 +28,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +52,9 @@ jobs:
         env:
           MARKETS: ${{ inputs.markets || 'AU,US' }}
           FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
-        run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled
+        # Gentle mode: one company at a time, pauses between, backs off when Yahoo pushes back,
+        # and spends at most 40 minutes per market on company financials.
+        run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled --fund-minutes 40 --fund-delay 2
 
       - name: Save data for the next run
         if: always()

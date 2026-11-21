@@ -524,7 +524,24 @@ def screen_universe(m: pd.DataFrame, cfg: dict) -> list[str]:
     return u.sort_values("mcap", ascending=False)["code"].tolist()
 
 
-def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool) -> dict:
+def _reset_yahoo_session() -> None:
+    """After a block, drop yfinance's saved cookie/crumb so the next request signs in afresh."""
+    try:
+        from yfinance.data import YfData
+        d = YfData()
+        for attr in ("_crumb", "_cookie"):
+            if hasattr(d, attr):
+                setattr(d, attr, None)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool, gentle: dict | None = None) -> dict:
+    """Load cached fundamentals and fetch missing/stale ones.
+
+    gentle = {"delay": s, "minutes": m} fetches one company at a time with a pause between,
+    backs off when Yahoo rate-limits, and stops after `minutes` (used on GitHub Actions).
+    """
     ymap = dict(zip(m["code"], m["yahoo"]))
     movers = pick_fund_targets(m, cfg, watch)
     codes = list(dict.fromkeys(movers + screen_universe(m, cfg)))
@@ -539,10 +556,45 @@ def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool)
     need.sort(key=lambda c: (c in res, c not in mset))      # missing first, then today's movers
     budget = len(need) if full else min(len(need), cfg["fund_max_fetch"])
     todo = need[:budget]
-    log(f"  fundamentals: {len(codes)} stocks in scope, {len(res)} cached, fetching {len(todo)} now"
-        + ("" if budget == len(need) else f" ({len(need) - budget} more on later runs)"))
+    log(f"  fundamentals: {len(codes)} stocks in scope, {len(res)} cached, {len(need)} to fetch"
+        + (f", trying up to {len(todo)} now" if budget < len(need) else ""))
+    if not todo:
+        return res
+
+    if gentle:
+        t_end = time.time() + gentle["minutes"] * 60
+        delay, got, strikes, i = gentle["delay"], 0, 0, 0
+        backoffs = [60, 180, 420]
+        while i < len(todo):
+            if time.time() > t_end:
+                log(f"  time limit reached after {got} companies; the rest come on the next run")
+                break
+            c = todo[i]
+            try:
+                res[c] = fetch_fundamentals(ymap[c])
+                got += 1
+                strikes = 0
+                i += 1
+            except RateLimited:
+                if strikes >= len(backoffs):
+                    log(f"  Yahoo is still blocking after {got} companies; stopping until the next run")
+                    break
+                wait = backoffs[strikes]
+                strikes += 1
+                log(f"  Yahoo is rate-limiting; pausing {wait}s (attempt {strikes} of {len(backoffs)})")
+                time.sleep(wait)
+                _reset_yahoo_session()
+                continue                      # retry the same company
+            except Exception as e:  # noqa: BLE001
+                log(f"  {c}: {e}")
+                i += 1
+            if got and got % 50 == 0 and strikes == 0:
+                log(f"  fundamentals {got} fetched, {len(todo) - i} to go")
+            time.sleep(delay)
+        log(f"  fundamentals: {got} fetched this run, {len(res)} of {len(codes)} now covered")
+        return res
+
     errors = 0
-    done = 0
     for i in range(0, len(todo), 40):
         chunk = todo[i:i + 40]
         with ThreadPoolExecutor(FUND_THREADS) as ex:
@@ -551,7 +603,6 @@ def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool)
                 c = futs[fu]
                 try:
                     res[c] = fu.result()
-                    done += 1
                 except RateLimited:
                     errors += 1
                 except Exception as e:  # noqa: BLE001
@@ -651,7 +702,8 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
     if m.empty:
         raise RuntimeError("no price data came back from Yahoo Finance")
     log(f"{mkt}: {len(m)} stocks, {int(m['traded'].sum())} traded on {mdate:%Y-%m-%d}")
-    fund = {} if args.no_fundamentals else gather_fundamentals(m, cfg, watch, args.fundamentals_full)
+    gentle = {"delay": args.fund_delay, "minutes": args.fund_minutes} if args.fund_minutes else None
+    fund = {} if args.no_fundamentals else gather_fundamentals(m, cfg, watch, args.fundamentals_full, gentle)
     if fund:
         apply_fx(fund, cfg["ccy"])
     idx = index_moves(cfg["indices"])
@@ -790,6 +842,9 @@ def main():
     ap.add_argument("--mock", action="store_true", help="synthetic data, no internet")
     ap.add_argument("--open", action="store_true", help="open the dashboard when done")
     ap.add_argument("--scheduled", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--fund-minutes", type=float, default=0,
+                    help="gentle mode: fetch fundamentals one at a time for at most this many minutes per market")
+    ap.add_argument("--fund-delay", type=float, default=1.5, help="gentle mode: seconds between companies")
     args = ap.parse_args()
 
     OUT.mkdir(exist_ok=True)
