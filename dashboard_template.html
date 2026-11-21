@@ -1306,7 +1306,8 @@ function renderNav(){ const n=$("navlinks"); n.replaceChildren();
   const ico={brief:'<path d="M4 5h16M4 12h16M4 19h10"/>',moves:'<path d="M3 17l5-6 4 4 8-9"/><path d="M14 6h6v6"/>',value:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',buffett:'<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.3l-4.8 2.6.9-5.4L4.2 8.7l5.4-.8z"/>',
     watch:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',portfolio:'<rect x="3.5" y="7" width="17" height="12.5" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>',berkshire:'<path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6"/>'};
   ["brief","moves","value","buffett","watch","portfolio","berkshire"].forEach(v=>{
-    const a=el("a",{class:"navitem"+(S.view===v||(v==="value"&&false)?" on":""),href:`#/${M.id}/${v}`,"aria-current":S.view===v?"page":null});
+    const mk=v==="berkshire"&&D.markets.some(m=>m.id==="US")?"US":M.id;
+    const a=el("a",{class:"navitem"+(S.view===v?" on":""),href:`#/${mk}/${v}`,"aria-current":S.view===v?"page":null});
     a.innerHTML=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ico[v]}</svg>`;
     a.append(el("span",{text:VIEWS[v]}));
     if(v==="watch") a.append(el("span",{class:"navcount",id:"watchcount"}));
@@ -1601,11 +1602,14 @@ function renderPortfolio(){ const host=$("view-portfolio"); host.replaceChildren
 }
 
 // ---------- Berkshire page ----------
-function renderBerkshirePage(){ const host=$("view-berkshire");
-  if(!M.berkshire){ host.replaceChildren(el("div",{class:"panel empty"},M.id==="US"?"Berkshire Hathaway's holdings haven't been collected yet. They arrive with the next US update.":"Berkshire Hathaway's filings list US-listed shares. ",
-    M.id!=="US"&&D.markets.some(m=>m.id==="US")?el("button",{class:"linkbtn",text:"Switch to United States",onclick:()=>{ location.hash="#/US/berkshire"; }}):null)); $("lede").textContent=""; return; }
+function renderBerkshirePage(){ const host=$("view-berkshire"), sec=$("sec-berkshire");
+  let msg=$("brkmsg"); if(!msg){ msg=el("div",{id:"brkmsg"}); host.prepend(msg); }
+  if(!M.berkshire){ sec.hidden=true; $("lede").textContent="";
+    msg.replaceChildren(el("div",{class:"panel empty"},M.id==="US"?"Berkshire Hathaway's holdings haven't been collected yet. They arrive with the next US update.":"Berkshire Hathaway's filings list US-listed shares. ",
+      M.id!=="US"&&D.markets.some(m=>m.id==="US")?el("button",{class:"linkbtn",text:"Show them in the US view",onclick:()=>{ location.hash="#/US/berkshire"; }}):null)); return; }
+  msg.replaceChildren(); sec.hidden=false;
   $("lede").textContent="What Warren Buffett's company reported owning at the end of the last quarter, and what changed.";
-  if(!host.contains($("sec-berkshire"))) return; $("sec-berkshire").hidden=false; renderBerkshire(); }
+  renderBerkshire(); }
 
 // ---------- render ----------
 function render(){
