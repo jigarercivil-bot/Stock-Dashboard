@@ -737,6 +737,7 @@ def market_payload(mkt, m, hist, mdate, fund, idx, source, stats=None) -> dict:
         "capBuckets": [{"name": n, "min": lo} for n, lo in cfg["caps"]],
         "cols": list(m.columns), "rows": clean.values.tolist(),
         "hist": hist, "fund": fund, "indices": idx, "stats": stats or {},
+        "builtUtc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 
 
@@ -842,6 +843,19 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
 
 
 # ------------------------------------------------------------------ output ---
+def save_market(payload: dict) -> None:
+    CACHE.mkdir(exist_ok=True)
+    (CACHE / f"market_{payload['id']}.json").write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+
+
+def load_market(mkt: str):
+    f = CACHE / f"market_{mkt}.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def build_html(markets: list[dict], scheduled: bool = False) -> str:
     payload = {"generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
                "generatedUtc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -860,6 +874,8 @@ def main():
     ap.add_argument("--mock", action="store_true", help="synthetic data, no internet")
     ap.add_argument("--open", action="store_true", help="open the dashboard when done")
     ap.add_argument("--scheduled", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--only", action="store_true",
+                    help="show only the markets built this run (don't add the other market's last saved build)")
     ap.add_argument("--fund-minutes", type=float, default=0,
                     help="gentle mode: fetch fundamentals one at a time for at most this many minutes per market")
     ap.add_argument("--fund-delay", type=float, default=1.5, help="gentle mode: seconds between companies")
@@ -877,11 +893,22 @@ def main():
         markets = [mock_market(mk, 900 if mk == "AU" else 1400, 7 + i) for i, mk in enumerate(wanted)]
     else:
         watch = read_watchlist()
+        built = {}
         for mk in wanted:
             try:
-                markets.append(build_market(mk, args, watch[mk]))
+                built[mk] = build_market(mk, args, watch[mk])
+                save_market(built[mk])
             except Exception as e:  # noqa: BLE001
                 log(f"{mk} skipped: {e}")
+        # Markets not rebuilt this run (or that failed) keep their last saved version,
+        # so the ASX and US runs at different times both show both markets.
+        for mk in MARKETS:
+            if mk not in built and not args.only:
+                prev = load_market(mk)
+                if prev:
+                    log(f"{mk}: reusing the last saved build from {prev.get('builtUtc', 'earlier')}")
+                    built[mk] = prev
+        markets = [built[mk] for mk in MARKETS if mk in built]
         if not markets:
             sys.exit("No market could be built. Check your internet connection and try again in a few minutes.")
 

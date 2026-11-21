@@ -1048,24 +1048,25 @@ $("vclear").onclick=()=>{ S.vf.f={}; markCustom(); S.vf.page=0; renderValueContr
 
 
 // ---------- last sync ----------
-function syncHealth(m){ const st=m.stats||{}, f=st.fund||{};
+// must match the two cron lines in .github/workflows/build.yml (UTC, Mon–Fri)
+const SCHED_UTC={AU:{h:6,m:47,days:[1,2,3,4,5]},US:{h:22,m:17,days:[0,1,2,3,4]}};
+function schedAt(id,now,dir){ const sc=SCHED_UTC[id]; if(!sc) return null; const d=new Date(now); d.setUTCHours(sc.h,sc.m,0,0);
+  for(let i=0;i<9;i++){ if((dir<0?d<=now:d>now)&&sc.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()+(dir<0?-1:1)); } return null; }
+function ago(ms){ const m=Math.round(ms/6e4); if(m<60) return m<=1?"just now":`${m} minutes ago`; const h=Math.round(m/60); if(h<48) return `${h} hour${h===1?"":"s"} ago`; return `${Math.round(h/24)} days ago`; }
+function builtAt(m){ return m.builtUtc?new Date(m.builtUtc):(D.generatedUtc?new Date(D.generatedUtc):null); }
+function isStale(m,now){ if(!D.scheduled) return false; const last=schedAt(m.id,now,-1), b=builtAt(m);
+  return !!(last&&b&&now-last>2*36e5&&b<last-36e5); }
+function syncHealth(m){ const st=m.stats||{}, f=st.fund||{}, now=new Date();
   const pr=st.listed?st.priced/st.listed:1;
   if(pr<0.9||(f.tried>10&&f.fetched===0)) return {cls:"bad-dot",label:"problem"};
-  if(pr<0.98||f.stopped||(f.failed>5&&f.failed>f.fetched)) return {cls:"warn-dot",label:"partial"};
+  if(pr<0.98||f.stopped||(f.failed>5&&f.failed>f.fetched)||isStale(m,now)) return {cls:"warn-dot",label:"partial"};
   return {cls:"ok-dot",label:"ok"}; }
-const SCHED_UTC={h:22,m:17,days:[1,2,3,4,5]};   // must match .github/workflows/build.yml
-function lastScheduled(now){ const d=new Date(now); d.setUTCHours(SCHED_UTC.h,SCHED_UTC.m,0,0);
-  for(let i=0;i<8;i++){ if(d<=now&&SCHED_UTC.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()-1); } return null; }
-function nextScheduled(now){ const d=new Date(now); d.setUTCHours(SCHED_UTC.h,SCHED_UTC.m,0,0);
-  for(let i=0;i<8;i++){ if(d>now&&SCHED_UTC.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()+1); } return null; }
-function ago(ms){ const m=Math.round(ms/6e4); if(m<60) return m<=1?"just now":`${m} minutes ago`; const h=Math.round(m/60); if(h<48) return `${h} hour${h===1?"":"s"} ago`; return `${Math.round(h/24)} days ago`; }
 function renderSync(){
-  const t=D.generatedUtc?new Date(D.generatedUtc):null, now=new Date();
+  const now=new Date(), t=D.generatedUtc?new Date(D.generatedUtc):null;
   const short=d=>d.toLocaleString("en-AU",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
   const long=d=>d.toLocaleString("en-AU",{weekday:"long",day:"numeric",month:"long",hour:"numeric",minute:"2-digit"});
-  const last=D.scheduled?lastScheduled(now):null;
-  const stale=!!(t&&last&&now-last>2*36e5&&t<last-36e5);
-  const btn=$("syncbtn"); btn.classList.toggle("stale",stale);
+  const anyStale=D.markets.some(m=>isStale(m,now));
+  $("syncbtn").classList.toggle("stale",anyStale);
   $("synctext").replaceChildren("Last updated ", el("b",{text:t?short(t):D.generated}));
   const tot=D.markets.reduce((a,m)=>{ const st=m.stats||{}, f=st.fund||{}; a.p+=st.priced||0; a.l+=st.listed||0; a.fc+=f.covered??Object.keys(m.fund||{}).length; a.fs+=f.scope||0; return a; },{p:0,l:0,fc:0,fs:0});
   const hs=D.markets.map(syncHealth), worst=hs.find(h=>h.cls==="bad-dot")||hs.find(h=>h.cls==="warn-dot")||hs[0]||{cls:"ok-dot"};
@@ -1074,22 +1075,22 @@ function renderSync(){
     tot.fs? el("span",{style:"margin-left:6px"},"Financials ",el("b",{text:`${tot.fc.toLocaleString()} / ${tot.fs.toLocaleString()}`})) : "");
   sc.title = worst.cls==="ok-dot"? "Everything synced" : worst.cls==="warn-dot"? "Partly synced: click for details" : "Sync problem: click for details";
   const pop=$("syncpop"); pop.replaceChildren(el("h4",{text:"Data sync"}),
-    el("div",{class:"note",style:"margin-bottom:8px",text:t?`${long(t)}, ${ago(now-t)}`:`Built ${D.generated}`}));
-  D.markets.forEach(m=>{ const st=m.stats||{}, f=st.fund||{}, nf=Object.keys(m.fund||{}).length, h=syncHealth(m);
-    const row=(k,v,c)=>el("div",{class:"row"+(c?" "+c:"")},el("span",{text:k}),el("span",{text:v}));
+    el("div",{class:"note",style:"margin-bottom:4px",text:t?`Page built ${long(t)}, ${ago(now-t)}`:`Built ${D.generated}`}));
+  const row=(k,v,c)=>el("div",{class:"row"+(c?" "+c:"")},el("span",{text:k}),el("span",{text:v}));
+  D.markets.forEach(m=>{ const st=m.stats||{}, f=st.fund||{}, nf=Object.keys(m.fund||{}).length, h=syncHealth(m), b=builtAt(m);
     pop.append(el("div",{class:"mk"},el("span",{class:"sdot "+h.cls,style:"display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px"}),`${m.name} (${m.exchange})`));
+    if(b) pop.append(row("Updated",`${short(b)}, ${ago(now-b)}`, isStale(m,now)?"warnrow":""));
     pop.append(row("Prices",`Close of ${fmtDate(m.marketDate,{weekday:"short",day:"numeric",month:"short"})}`));
     if(st.listed) pop.append(row("Companies priced",`${(st.priced||0).toLocaleString()} of ${st.listed.toLocaleString()} listed`, st.priced/st.listed<0.9?"bad":st.priced/st.listed<0.98?"warnrow":""));
     pop.append(row("Financials on file",f.scope?`${(f.covered??nf).toLocaleString()} of ${f.scope.toLocaleString()} in scope`:`${nf.toLocaleString()} companies`, f.scope&&(f.covered??nf)/f.scope<0.9?"warnrow":""));
-    if(f.tried!=null) pop.append(row("This run",`${f.fetched} fetched`+(f.failed?`, ${f.failed} failed`:"")+(f.due>f.tried?`, ${(f.due-f.tried).toLocaleString()} still to do`:""), f.failed>f.fetched&&f.failed>5?"bad":""));
-    if(f.stopped==="yahoo") pop.append(el("div",{class:"note",text:"Yahoo limited downloads, so this run stopped early. The rest come on the next runs."}));
-    else if(f.stopped==="time") pop.append(el("div",{class:"note",text:"Reached this run's time limit for financials. The rest come on the next runs."})); });
-  if(D.scheduled){ const nx=nextScheduled(now);
-    if(nx) pop.append(el("div",{class:"row"},el("span",{text:"Next automatic update"}),el("span",{text:long(nx)})));
-    pop.append(el("div",{class:"note",style:"margin-top:6px",text:"Runs every weekday after both markets close. GitHub sometimes starts it up to 30 minutes late."})); }
-  else pop.append(el("div",{class:"note",style:"margin-top:6px",text:"Built on this computer. Run run_dashboard.bat to update."}));
-  if(stale) pop.append(el("div",{class:"warn",text:`The ${short(last)} update hasn't arrived yet. Check the Actions tab on GitHub, or start a run there with "Run workflow".`}));
-  pop.append(el("div",{class:"note",style:"margin-top:8px",text:"Times are in your local time zone."}));
+    if(f.tried!=null) pop.append(row("That run",`${f.fetched} fetched`+(f.failed?`, ${f.failed} failed`:"")+(f.due>f.tried?`, ${(f.due-f.tried).toLocaleString()} still to do`:""), f.failed>f.fetched&&f.failed>5?"bad":""));
+    if(D.scheduled){ const nx=schedAt(m.id,now,1); if(nx) pop.append(row("Next update",short(nx))); }
+    if(f.stopped==="yahoo") pop.append(el("div",{class:"note",text:"Yahoo limited downloads, so that run stopped early. The rest come on the next runs."}));
+    else if(f.stopped==="time") pop.append(el("div",{class:"note",text:"Reached that run's time limit for financials. The rest come on the next runs."}));
+    if(isStale(m,now)) pop.append(el("div",{class:"warn",text:`The ${short(schedAt(m.id,now,-1))} ${m.name} update hasn't arrived. Check the Actions tab on GitHub, or start a run there with "Run workflow".`})); });
+  pop.append(el("div",{class:"note",style:"margin-top:10px",text: D.scheduled
+    ? "The ASX updates after its 4pm close and the US after New York's close (the next Sydney morning), Monday to Friday Sydney time. GitHub sometimes starts a run up to 30 minutes late. Times are in your local time zone."
+    : "Built on this computer. Run run_dashboard.bat to update. Times are in your local time zone."}));
 }
 $("synccount").addEventListener("click",e=>{ e.stopPropagation(); $("syncbtn").click(); });
 $("syncbtn").addEventListener("click",e=>{ e.stopPropagation(); const p=$("syncpop"), open=p.hidden; if(open) renderSync(); p.hidden=!open; $("syncbtn").setAttribute("aria-expanded",String(open)); });

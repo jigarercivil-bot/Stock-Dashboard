@@ -2,13 +2,15 @@ name: Build Stock Dashboard
 
 on:
   schedule:
-    # 22:17 UTC Mon–Fri = 9:17am Sydney Tue–Sat (8:17am in winter):
-    # after both the ASX close and the US close for the previous trading day.
-    - cron: "17 22 * * 1-5"
+    # ASX: 06:47 UTC Mon–Fri = 5:47pm Sydney (4:47pm in winter), after the 4pm close.
+    - cron: "47 6 * * 1-5"
+    # US: 22:17 UTC Sun–Thu = 9:17am Sydney Mon–Fri (8:17am in winter), after the New York close.
+    # Monday morning's run picks up Friday's US close, so nothing runs on a Sydney weekend.
+    - cron: "17 22 * * 0-4"
   workflow_dispatch:
     inputs:
       markets:
-        description: "Markets to build (AU, US or AU,US)"
+        description: "Markets to rebuild (AU, US or AU,US). The other market keeps its last build."
         default: "AU,US"
         required: false
       fundamentals_full:
@@ -50,7 +52,7 @@ jobs:
 
       - name: Build Stock Dashboard
         env:
-          MARKETS: ${{ inputs.markets || 'AU,US' }}
+          MARKETS: ${{ github.event.schedule == '47 6 * * 1-5' && 'AU' || github.event.schedule == '17 22 * * 0-4' && 'US' || inputs.markets || 'AU,US' }}
           FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
         # Gentle mode: one company at a time, pauses between, backs off when Yahoo pushes back,
         # and spends at most 40 minutes per market on company financials.
