@@ -600,7 +600,7 @@ const D = /*__DATA__*/null;
   fetch(base+"/counter/TOTAL.json").then(r=>r.ok?r.json():null).then(j=>{ if(!j||j.count==null) return;
     const n=String(j.count).replace(/[^0-9]/g,""); if(!n) return;
     document.getElementById("viewnum").textContent=Number(n).toLocaleString("en-AU");
-    document.getElementById("viewword").textContent=n==="1"?" view":" views";
+    document.getElementById("viewword").textContent=n==="1"?" visit":" visits";
     document.getElementById("viewcount").hidden=false; if(window.fitSync) fitSync(); }).catch(()=>{}); })();
 </script>
 <script>
