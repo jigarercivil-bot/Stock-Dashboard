@@ -1196,7 +1196,7 @@ def load_market(mkt: str):
 
 # GoatCounter site code for the public view counter (https://<code>.goatcounter.com).
 # Leave empty to turn the counter off. GOATCOUNTER_SITE in the environment overrides it.
-GOATCOUNTER_SITE = ""
+GOATCOUNTER_SITE = "jigarkumar"
 
 
 def build_html(markets: list[dict], scheduled: bool = False) -> str:
