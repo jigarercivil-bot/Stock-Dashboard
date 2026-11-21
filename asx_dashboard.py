@@ -433,7 +433,8 @@ INFO_FIELDS = ["trailingPE", "forwardPE", "priceToBook", "trailingEps", "forward
                "revenueGrowth", "earningsGrowth", "grossMargins", "operatingMargins", "profitMargins",
                "returnOnEquity", "returnOnAssets", "currentRatio", "quickRatio", "debtToEquity",
                "trailingAnnualDividendYield", "dividendYield", "payoutRatio", "trailingPegRatio",
-               "targetMeanPrice", "numberOfAnalystOpinions", "heldPercentInsiders", "sharesOutstanding", "beta"]
+               "targetMeanPrice", "numberOfAnalystOpinions", "heldPercentInsiders", "sharesOutstanding", "beta",
+               "exDividendDate", "lastDividendValue", "dividendRate", "earningsTimestampStart"]
 
 
 class RateLimited(Exception):
@@ -674,6 +675,125 @@ def apply_fx(fund: dict, trade_ccy: str) -> None:
 
 
 
+# ------------------------------------------------- ASX announcements/halts ---
+ASX_ANN_URL = "https://asx.api.markitdigital.com/asx-research/1.0/markets/announcements"
+ANN_KINDS = [  # (tag, keywords in headline or announcement type), first match wins
+    ("Trading halt", ["trading halt", "pause in trading"]),
+    ("Suspension", ["suspension from official quotation", "suspension from quotation", "voluntary suspension"]),
+    ("Reinstatement", ["reinstatement to official quotation", "reinstatement to quotation"]),
+    ("Price query", ["price query", "aware letter", "response to asx query", "asx query"]),
+    ("Takeover", ["takeover", "scheme ", "scheme implementation", "bidder", "target's statement", "merger", "acquisition"]),
+    ("Capital raising", ["placement", "capital raising", "entitlement offer", "share purchase plan", "rights issue", "institutional offer"]),
+    ("Exploration", ["drill", "assay", "intercept", "exploration", "mineral resource", "ore reserve", "mineralis", "mineraliz",
+                     "high grade", "high-grade", "hits of", "metres at", "m at "]),
+    ("AGM", ["agm", "annual general meeting", "chair's address", "chairman's address", "results of meeting"]),
+    ("Results", ["results", "half year", "half-year", "full year", "annual report", "appendix 4d", "appendix 4e",
+                 "quarterly activities", "quarterly cash", "appendix 4c", "appendix 5b", "investor presentation",
+                 "preliminary final", "financial report"]),
+    ("Guidance", ["guidance", "outlook", "trading update", "earnings update", "market update"]),
+    ("Contract", ["contract", "agreement", "partnership", "award", "offtake", "purchase order"]),
+    ("Dividend", ["dividend", "distribution"]),
+]
+
+
+def ann_kind(head: str, types: list) -> str:
+    text = " " + re.sub(r"[^a-z0-9' ]", " ", (head + " " + " ".join(types or [])).lower()) + " "
+    for tag, kws in ANN_KINDS:
+        if any(re.search(r"\b" + re.escape(k), text) for k in kws):
+            return tag
+    return "Other"
+
+
+def asx_announcements(market_date, days_back: int = 0) -> list[dict]:
+    """Announcements from the market date (Sydney time), newest first. With days_back, also earlier days
+    (those carry a "day" field and are only used to rebuild the list of trading halts)."""
+    import requests
+    from zoneinfo import ZoneInfo
+
+    syd = ZoneInfo("Australia/Sydney")
+    day = pd.Timestamp(market_date).date()
+    first = (pd.Timestamp(market_date) - pd.Timedelta(days=days_back)).date()
+    out, seen = [], set()
+    for page in range(40 + 15 * days_back):
+        try:
+            r = requests.get(ASX_ANN_URL, params={"itemsPerPage": 100, "page": page}, headers=UA, timeout=45)
+            r.raise_for_status()
+            items = (r.json().get("data") or {}).get("items") or []
+        except Exception as e:  # noqa: BLE001
+            log(f"  ASX announcements page {page} failed: {e}")
+            break
+        if not items:
+            break
+        older = False
+        for it in items:
+            try:
+                t = datetime.fromisoformat(it["date"].replace("Z", "+00:00")).astimezone(syd)
+            except Exception:  # noqa: BLE001
+                continue
+            if t.date() < first:
+                older = True
+                continue
+            if t.date() > day:
+                continue
+            key = it.get("documentKey") or (it.get("symbol"), it.get("headline"), it.get("date"))
+            if key in seen:
+                continue
+            seen.add(key)
+            head = (it.get("headline") or "").strip()
+            types = it.get("announcementTypes") or []
+            a = {"t": t.strftime("%H:%M"), "code": (it.get("symbol") or "").upper(), "head": head,
+                 "kind": ann_kind(head, types), "ps": bool(it.get("isPriceSensitive"))}
+            if t.date() != day:
+                if a["kind"] not in ("Trading halt", "Suspension", "Reinstatement"):
+                    continue
+                a["day"] = t.strftime("%Y-%m-%d")
+            out.append(a)
+        if older:
+            break
+        time.sleep(0.4)
+    today = [a for a in out if "day" not in a]
+    log(f"  ASX announcements: {len(today)} on {day}, {sum(a['ps'] for a in today)} price sensitive")
+    return out
+
+
+def update_halts(anns: list[dict], m: pd.DataFrame, market_date) -> list[dict]:
+    """Keep a running list of halted/suspended ASX stocks between runs."""
+    CACHE.mkdir(exist_ok=True)
+    f = CACHE / "halts.json"
+    try:
+        halts = json.loads(f.read_text()) if f.exists() else {}
+    except Exception:  # noqa: BLE001
+        halts = {}
+    day = pd.Timestamp(market_date).strftime("%Y-%m-%d")
+    for a in sorted(anns, key=lambda a: (a.get("day", day), a["t"])):
+        if a["kind"] in ("Trading halt", "Suspension"):
+            halts[a["code"]] = {"code": a["code"], "since": a.get("day", day), "time": a["t"], "head": a["head"],
+                                "kind": "suspension" if a["kind"] == "Suspension" else "halt"}
+        elif a["kind"] == "Reinstatement":
+            halts.pop(a["code"], None)
+    traded = set(m.loc[m["traded"] & (m["vol"].fillna(0) > 0), "code"]) if len(m) else set()
+    bdays = pd.bdate_range(day, periods=4)
+    for code in list(halts):
+        h = halts[code]
+        # traded on a later day than the halt: it has resumed
+        if code in traded and h["since"] < day:
+            halts.pop(code)
+            continue
+        # a halt lasts at most two trading days; if still quiet it usually becomes a suspension
+        if h["kind"] == "halt":
+            start = pd.Timestamp(h["since"])
+            h["resumeBy"] = pd.bdate_range(start, periods=3)[-1].strftime("%Y-%m-%d")
+            if h["resumeBy"] < day:
+                h["kind"] = "suspension"
+                h.pop("resumeBy", None)
+        if (pd.Timestamp(day) - pd.Timestamp(h["since"])).days > 120:
+            halts.pop(code)
+    f.write_text(json.dumps(halts))
+    log(f"  halts: {sum(h['kind'] == 'halt' for h in halts.values())} trading halts, "
+        f"{sum(h['kind'] == 'suspension' for h in halts.values())} suspensions")
+    return sorted(halts.values(), key=lambda h: (h["kind"] != "halt", h["since"]), reverse=False)
+
+
 # ---------------------------------------------------------- Berkshire 13F ---
 BRK_CIK = "0001067983"
 # The SEC asks every automated request to name a contact ("Name email"). Set SEC_CONTACT
@@ -888,6 +1008,14 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
     payload = market_payload(mkt, m, hist, mdate, fund, idx, src, stats)
     if mkt == "US":
         payload["berkshire"] = berkshire_holdings(m)
+    if mkt == "AU":
+        try:
+            first_time = not (CACHE / "halts.json").exists()
+            anns = asx_announcements(mdate, days_back=7 if first_time else 0)
+            payload["announcements"] = [a for a in anns if "day" not in a]
+            payload["halts"] = update_halts(anns, m, mdate)
+        except Exception as e:  # noqa: BLE001
+            log(f"  ASX announcements skipped: {e}")
     return payload
 
 
