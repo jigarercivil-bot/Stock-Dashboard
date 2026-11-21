@@ -180,7 +180,15 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 .syncwrap{position:relative;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .viewcount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2)}
 .viewcount[hidden]{display:none!important}
-@media (max-width:640px){.viewcount{padding:8px 10px;font-size:12px}}
+.sm{display:none}
+@media (max-width:640px){
+  .topline{gap:8px}
+  .syncwrap{flex-wrap:nowrap;gap:6px;width:100%;overflow-x:auto;scrollbar-width:none}
+  .syncwrap::-webkit-scrollbar{display:none}
+  .viewcount,.synccount,.syncbtn{padding:7px 8px;font-size:11.5px;gap:5px;white-space:nowrap;flex:0 0 auto;border-radius:10px}
+  .lg{display:none} .sm{display:inline}
+}
+@media (max-width:375px){ .viewcount,.synccount,.syncbtn{padding:6px 6px;font-size:11px;gap:4px} .syncwrap{gap:4px} }
 .synccount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer}
 .synccount b{color:var(--text)}
 .synccount .sdot{width:8px;height:8px;border-radius:50%}
@@ -440,7 +448,7 @@ details.panel>summary{cursor:pointer}
     <div class="topline">
       <div class="pagetag" id="pagetag"></div>
       <div class="syncwrap">
-        <span class="viewcount" id="viewcount" hidden title="Visits to this dashboard, counted by GoatCounter"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span id="viewnum"></span></span>
+        <span class="viewcount" id="viewcount" hidden title="Visits to this dashboard, counted by GoatCounter"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span id="viewnum"></span><span class="lg" id="viewword"></span></span>
         <button class="synccount" id="synccount" aria-controls="syncpop"></button>
         <button class="syncbtn" id="syncbtn" aria-expanded="false" aria-controls="syncpop"><span class="sdot"></span><span id="synctext"></span></button>
         <div class="syncpop" id="syncpop" hidden></div>
@@ -589,7 +597,8 @@ const D = /*__DATA__*/null;
   sc.dataset.goatcounter=base+"/count"; document.head.appendChild(sc);
   fetch(base+"/counter/TOTAL.json").then(r=>r.ok?r.json():null).then(j=>{ if(!j||j.count==null) return;
     const n=String(j.count).replace(/[^0-9]/g,""); if(!n) return;
-    document.getElementById("viewnum").textContent=Number(n).toLocaleString("en-AU")+(n==="1"?" view":" views");
+    document.getElementById("viewnum").textContent=Number(n).toLocaleString("en-AU");
+    document.getElementById("viewword").textContent=n==="1"?" view":" views";
     document.getElementById("viewcount").hidden=false; }).catch(()=>{}); })();
 </script>
 <script>
@@ -1689,12 +1698,15 @@ function renderSync(){
   const long=d=>d.toLocaleString("en-AU",{weekday:"long",day:"numeric",month:"long",hour:"numeric",minute:"2-digit"});
   const anyStale=D.markets.some(m=>isStale(m,now));
   $("syncbtn").classList.toggle("stale",anyStale);
-  $("synctext").replaceChildren("Last updated ", el("b",{text:t?short(t):D.generated}));
+  const tiny=d=>d.toDateString()===now.toDateString()? d.toLocaleString("en-AU",{hour:"numeric",minute:"2-digit"}) : d.toLocaleString("en-AU",{day:"numeric",month:"short"});
+  $("synctext").replaceChildren(el("span",{class:"lg"},"Last updated "), el("b",{class:"lg",text:t?short(t):D.generated}), t?el("b",{class:"sm",text:tiny(t)}):"");
   const tot=D.markets.reduce((a,m)=>{ const st=m.stats||{}, f=st.fund||{}; a.p+=st.priced||0; a.l+=st.listed||0; a.fc+=f.covered??Object.keys(m.fund||{}).length; a.fs+=f.scope||0; return a; },{p:0,l:0,fc:0,fs:0});
   const hs=D.markets.map(syncHealth), worst=hs.find(h=>h.cls==="bad-dot")||hs.find(h=>h.cls==="warn-dot")||hs[0]||{cls:"ok-dot"};
   const sc=$("synccount"); sc.replaceChildren(el("span",{class:"sdot "+worst.cls}),
-    tot.l? el("span",null,"Prices ",el("b",{text:`${tot.p.toLocaleString()} / ${tot.l.toLocaleString()}`})) : "",
-    tot.fs? el("span",{style:"margin-left:6px"},"Financials ",el("b",{text:`${tot.fc.toLocaleString()} / ${tot.fs.toLocaleString()}`})) : "");
+    tot.l? el("span",{class:"lg"},"Prices ",el("b",{text:`${tot.p.toLocaleString()} / ${tot.l.toLocaleString()}`})) : "",
+    tot.fs? el("span",{class:"lg",style:"margin-left:6px"},"Financials ",el("b",{text:`${tot.fc.toLocaleString()} / ${tot.fs.toLocaleString()}`})) : "",
+    tot.l? el("span",{class:"sm"},"Prices ",el("b",{text:Math.floor(100*tot.p/tot.l)+"%"})) : "",
+    tot.fs? el("span",{class:"sm",style:"margin-left:4px"},"Fin ",el("b",{text:Math.floor(100*tot.fc/tot.fs)+"%"})) : "");
   sc.title = worst.cls==="ok-dot"? "Everything synced" : worst.cls==="warn-dot"? "Partly synced: click for details" : "Sync problem: click for details";
   const pop=$("syncpop"); pop.replaceChildren(el("h4",{text:"Data sync"}),
     el("div",{class:"note",style:"margin-bottom:4px",text:t?`Page built ${long(t)}, ${ago(now-t)}`:`Built ${D.generated}`}));
