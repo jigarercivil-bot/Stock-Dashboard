@@ -536,7 +536,7 @@ def _reset_yahoo_session() -> None:
         pass
 
 
-def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool, gentle: dict | None = None) -> dict:
+def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool, gentle: dict | None = None) -> tuple[dict, dict]:
     """Load cached fundamentals and fetch missing/stale ones.
 
     gentle = {"delay": s, "minutes": m} fetches one company at a time with a pause between,
@@ -558,16 +558,19 @@ def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool,
     todo = need[:budget]
     log(f"  fundamentals: {len(codes)} stocks in scope, {len(res)} cached, {len(need)} to fetch"
         + (f", trying up to {len(todo)} now" if budget < len(need) else ""))
+    stats = {"scope": len(codes), "due": len(need), "tried": 0, "fetched": 0, "failed": 0, "stopped": None}
     if not todo:
-        return res
+        stats["covered"] = len(res)
+        return res, stats
 
     if gentle:
         t_end = time.time() + gentle["minutes"] * 60
-        delay, got, strikes, i = gentle["delay"], 0, 0, 0
+        delay, got, strikes, i, failed = gentle["delay"], 0, 0, 0, 0
         backoffs = [60, 180, 420]
         while i < len(todo):
             if time.time() > t_end:
                 log(f"  time limit reached after {got} companies; the rest come on the next run")
+                stats["stopped"] = "time"
                 break
             c = todo[i]
             try:
@@ -578,6 +581,7 @@ def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool,
             except RateLimited:
                 if strikes >= len(backoffs):
                     log(f"  Yahoo is still blocking after {got} companies; stopping until the next run")
+                    stats["stopped"] = "yahoo"
                     break
                 wait = backoffs[strikes]
                 strikes += 1
@@ -587,34 +591,42 @@ def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool,
                 continue                      # retry the same company
             except Exception as e:  # noqa: BLE001
                 log(f"  {c}: {e}")
+                failed += 1
                 i += 1
             if got and got % 50 == 0 and strikes == 0:
                 log(f"  fundamentals {got} fetched, {len(todo) - i} to go")
             time.sleep(delay)
         log(f"  fundamentals: {got} fetched this run, {len(res)} of {len(codes)} now covered")
-        return res
+        stats.update(tried=i, fetched=got, failed=failed, covered=len(res))
+        return res, stats
 
-    errors = 0
+    errors, got, failed, tried = 0, 0, 0, 0
     for i in range(0, len(todo), 40):
         chunk = todo[i:i + 40]
         with ThreadPoolExecutor(FUND_THREADS) as ex:
             futs = {ex.submit(fetch_fundamentals, ymap[c]): c for c in chunk}
             for fu in as_completed(futs):
                 c = futs[fu]
+                tried += 1
                 try:
                     res[c] = fu.result()
+                    got += 1
                 except RateLimited:
                     errors += 1
+                    failed += 1
                 except Exception as e:  # noqa: BLE001
                     log(f"  {c}: {e}")
+                    failed += 1
         log(f"  fundamentals {min(i + 40, len(todo))}/{len(todo)}")
         if errors >= 15:
             log("  Yahoo is rate-limiting; stopping fundamentals here. The rest will come on the next run.")
+            stats["stopped"] = "yahoo"
             break
         if errors:
             time.sleep(10)
             errors = max(0, errors - 2)
-    return res
+    stats.update(tried=tried, fetched=got, failed=failed, covered=len(res))
+    return res, stats
 
 
 def apply_fx(fund: dict, trade_ccy: str) -> None:
@@ -703,7 +715,7 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
         raise RuntimeError("no price data came back from Yahoo Finance")
     log(f"{mkt}: {len(m)} stocks, {int(m['traded'].sum())} traded on {mdate:%Y-%m-%d}")
     gentle = {"delay": args.fund_delay, "minutes": args.fund_minutes} if args.fund_minutes else None
-    fund = {} if args.no_fundamentals else gather_fundamentals(m, cfg, watch, args.fundamentals_full, gentle)
+    fund, fstats = ({}, None) if args.no_fundamentals else gather_fundamentals(m, cfg, watch, args.fundamentals_full, gentle)
     if fund:
         apply_fx(fund, cfg["ccy"])
     idx = index_moves(cfg["indices"])
@@ -711,10 +723,11 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
     m.to_csv(HIST / f"{mkt}_{day}.csv", index=False)
     src = ("Prices from Yahoo Finance (end of day, delayed). Company list and market cap from "
            + ("the ASX." if mkt == "AU" else "Nasdaq's stock screener (all NYSE, Nasdaq and NYSE American listings)."))
-    return market_payload(mkt, m, hist, mdate, fund, idx, src)
+    stats = {"listed": len(uni), "priced": len(m), "traded": int(m["traded"].sum()), "fund": fstats}
+    return market_payload(mkt, m, hist, mdate, fund, idx, src, stats)
 
 
-def market_payload(mkt, m, hist, mdate, fund, idx, source) -> dict:
+def market_payload(mkt, m, hist, mdate, fund, idx, source, stats=None) -> dict:
     cfg = MARKETS[mkt]
     clean = m.astype(object).where(pd.notna(m), None)
     return {
@@ -723,7 +736,7 @@ def market_payload(mkt, m, hist, mdate, fund, idx, source) -> dict:
         "classification": cfg["classification"],
         "capBuckets": [{"name": n, "min": lo} for n, lo in cfg["caps"]],
         "cols": list(m.columns), "rows": clean.values.tolist(),
-        "hist": hist, "fund": fund, "indices": idx,
+        "hist": hist, "fund": fund, "indices": idx, "stats": stats or {},
     }
 
 
@@ -822,7 +835,10 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
         sp = [fnum(b * (1 + rng.gauss(0, 0.004) + 0.0008 * j), 1) for j in range(22)]
         idx.append({"sym": s, "name": nm, "last": sp[-1], "chg": fnum((sp[-1] / sp[-2] - 1) * 100, 2), "spark": sp})
     hist = {"dates": [d.strftime("%y%m%d") for d in days], "s": series}
-    return market_payload(mkt, m, hist, days[-1], fund, idx, "Synthetic test data — not real prices.")
+    stats = {"listed": len(m) + 6, "priced": len(m), "traded": len(m),
+             "fund": {"scope": int(len(m) * 0.9), "due": 300, "tried": 260, "fetched": 240, "failed": 20,
+                      "stopped": "yahoo", "covered": len(fund)}}
+    return market_payload(mkt, m, hist, days[-1], fund, idx, "Synthetic test data — not real prices.", stats)
 
 
 # ------------------------------------------------------------------ output ---

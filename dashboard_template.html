@@ -176,7 +176,13 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 /* ---------- views + value finder ---------- */
 .topline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
 .views{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
-.syncwrap{position:relative}
+.syncwrap{position:relative;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.synccount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer}
+.synccount b{color:var(--text)}
+.synccount .sdot{width:8px;height:8px;border-radius:50%}
+.ok-dot{background:var(--up)} .warn-dot{background:var(--brass)} .bad-dot{background:var(--down)}
+.syncpop .mk{font-weight:700;color:var(--text);margin:10px 0 2px;font-size:13.5px}
+.syncpop .row.bad span:last-child{color:var(--down)} .syncpop .row.warnrow span:last-child{color:var(--brass)}
 .syncbtn{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2)}
 .syncbtn:hover{border-color:var(--line-2);color:var(--text)}
 .syncbtn .sdot{width:8px;height:8px;border-radius:50%;background:var(--up);box-shadow:0 0 0 3px var(--up-soft)}
@@ -299,6 +305,7 @@ input[type=range]{width:100%;accent-color:var(--brass)}
     <div class="topline">
       <nav class="views" id="views" aria-label="View"><button data-v="moves">Today's moves</button><button data-v="value">Value finder</button></nav>
       <div class="syncwrap">
+        <button class="synccount" id="synccount" aria-controls="syncpop"></button>
         <button class="syncbtn" id="syncbtn" aria-expanded="false" aria-controls="syncpop"><span class="sdot"></span><span id="synctext"></span></button>
         <div class="syncpop" id="syncpop" hidden></div>
       </div>
@@ -1041,6 +1048,11 @@ $("vclear").onclick=()=>{ S.vf.f={}; markCustom(); S.vf.page=0; renderValueContr
 
 
 // ---------- last sync ----------
+function syncHealth(m){ const st=m.stats||{}, f=st.fund||{};
+  const pr=st.listed?st.priced/st.listed:1;
+  if(pr<0.9||(f.tried>10&&f.fetched===0)) return {cls:"bad-dot",label:"problem"};
+  if(pr<0.98||f.stopped||(f.failed>5&&f.failed>f.fetched)) return {cls:"warn-dot",label:"partial"};
+  return {cls:"ok-dot",label:"ok"}; }
 const SCHED_UTC={h:22,m:17,days:[1,2,3,4,5]};   // must match .github/workflows/build.yml
 function lastScheduled(now){ const d=new Date(now); d.setUTCHours(SCHED_UTC.h,SCHED_UTC.m,0,0);
   for(let i=0;i<8;i++){ if(d<=now&&SCHED_UTC.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()-1); } return null; }
@@ -1055,11 +1067,23 @@ function renderSync(){
   const stale=!!(t&&last&&now-last>2*36e5&&t<last-36e5);
   const btn=$("syncbtn"); btn.classList.toggle("stale",stale);
   $("synctext").replaceChildren("Last updated ", el("b",{text:t?short(t):D.generated}));
+  const tot=D.markets.reduce((a,m)=>{ const st=m.stats||{}, f=st.fund||{}; a.p+=st.priced||0; a.l+=st.listed||0; a.fc+=f.covered??Object.keys(m.fund||{}).length; a.fs+=f.scope||0; return a; },{p:0,l:0,fc:0,fs:0});
+  const hs=D.markets.map(syncHealth), worst=hs.find(h=>h.cls==="bad-dot")||hs.find(h=>h.cls==="warn-dot")||hs[0]||{cls:"ok-dot"};
+  const sc=$("synccount"); sc.replaceChildren(el("span",{class:"sdot "+worst.cls}),
+    tot.l? el("span",null,"Prices ",el("b",{text:`${tot.p.toLocaleString()} / ${tot.l.toLocaleString()}`})) : "",
+    tot.fs? el("span",{style:"margin-left:6px"},"Financials ",el("b",{text:`${tot.fc.toLocaleString()} / ${tot.fs.toLocaleString()}`})) : "");
+  sc.title = worst.cls==="ok-dot"? "Everything synced" : worst.cls==="warn-dot"? "Partly synced: click for details" : "Sync problem: click for details";
   const pop=$("syncpop"); pop.replaceChildren(el("h4",{text:"Data sync"}),
     el("div",{class:"note",style:"margin-bottom:8px",text:t?`${long(t)}, ${ago(now-t)}`:`Built ${D.generated}`}));
-  D.markets.forEach(m=>{ const nf=Object.keys(m.fund||{}).length;
-    pop.append(el("div",{class:"row"},el("span",{text:`${m.name} prices`}),el("span",{text:"Close of "+fmtDate(m.marketDate,{weekday:"short",day:"numeric",month:"short"})})),
-      el("div",{class:"row"},el("span",{text:`${m.name} financials`}),el("span",{text:`${nf.toLocaleString()} companies`}))); });
+  D.markets.forEach(m=>{ const st=m.stats||{}, f=st.fund||{}, nf=Object.keys(m.fund||{}).length, h=syncHealth(m);
+    const row=(k,v,c)=>el("div",{class:"row"+(c?" "+c:"")},el("span",{text:k}),el("span",{text:v}));
+    pop.append(el("div",{class:"mk"},el("span",{class:"sdot "+h.cls,style:"display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px"}),`${m.name} (${m.exchange})`));
+    pop.append(row("Prices",`Close of ${fmtDate(m.marketDate,{weekday:"short",day:"numeric",month:"short"})}`));
+    if(st.listed) pop.append(row("Companies priced",`${(st.priced||0).toLocaleString()} of ${st.listed.toLocaleString()} listed`, st.priced/st.listed<0.9?"bad":st.priced/st.listed<0.98?"warnrow":""));
+    pop.append(row("Financials on file",f.scope?`${(f.covered??nf).toLocaleString()} of ${f.scope.toLocaleString()} in scope`:`${nf.toLocaleString()} companies`, f.scope&&(f.covered??nf)/f.scope<0.9?"warnrow":""));
+    if(f.tried!=null) pop.append(row("This run",`${f.fetched} fetched`+(f.failed?`, ${f.failed} failed`:"")+(f.due>f.tried?`, ${(f.due-f.tried).toLocaleString()} still to do`:""), f.failed>f.fetched&&f.failed>5?"bad":""));
+    if(f.stopped==="yahoo") pop.append(el("div",{class:"note",text:"Yahoo limited downloads, so this run stopped early. The rest come on the next runs."}));
+    else if(f.stopped==="time") pop.append(el("div",{class:"note",text:"Reached this run's time limit for financials. The rest come on the next runs."})); });
   if(D.scheduled){ const nx=nextScheduled(now);
     if(nx) pop.append(el("div",{class:"row"},el("span",{text:"Next automatic update"}),el("span",{text:long(nx)})));
     pop.append(el("div",{class:"note",style:"margin-top:6px",text:"Runs every weekday after both markets close. GitHub sometimes starts it up to 30 minutes late."})); }
@@ -1067,6 +1091,7 @@ function renderSync(){
   if(stale) pop.append(el("div",{class:"warn",text:`The ${short(last)} update hasn't arrived yet. Check the Actions tab on GitHub, or start a run there with "Run workflow".`}));
   pop.append(el("div",{class:"note",style:"margin-top:8px",text:"Times are in your local time zone."}));
 }
+$("synccount").addEventListener("click",e=>{ e.stopPropagation(); $("syncbtn").click(); });
 $("syncbtn").addEventListener("click",e=>{ e.stopPropagation(); const p=$("syncpop"), open=p.hidden; if(open) renderSync(); p.hidden=!open; $("syncbtn").setAttribute("aria-expanded",String(open)); });
 document.addEventListener("click",e=>{ if(!$("syncpop").hidden&&!e.target.closest(".syncwrap")){ $("syncpop").hidden=true; $("syncbtn").setAttribute("aria-expanded","false"); } });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("syncpop").hidden){ $("syncpop").hidden=true; $("syncbtn").setAttribute("aria-expanded","false"); $("syncbtn").focus(); } });
