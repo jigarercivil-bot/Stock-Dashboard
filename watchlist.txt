@@ -1,0 +1,5 @@
+# Codes that always get fundamentals, one per line.
+#   PLS.AX   -> ASX only
+#   US:SOFI  -> US only
+#   ABC      -> whichever market lists it
+# Lines starting with # are ignored.

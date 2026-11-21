@@ -1,0 +1,83 @@
+name: Build Stock Dashboard
+
+on:
+  schedule:
+    # 22:17 UTC Mon–Fri = 9:17am Sydney Tue–Sat (8:17am in winter):
+    # after both the ASX close and the US close for the previous trading day.
+    - cron: "17 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      markets:
+        description: "Markets to build (AU, US or AU,US)"
+        default: "AU,US"
+        required: false
+      fundamentals_full:
+        description: "Fetch every missing fundamental now (slow, may hit Yahoo limits)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-dashboard
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install packages
+        run: pip install -r requirements.txt
+
+      # Company financials are cached between runs so coverage builds up over time.
+      - name: Restore saved data
+        uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: market-cache-${{ github.run_id }}
+          restore-keys: market-cache-
+
+      - name: Build Stock Dashboard
+        env:
+          MARKETS: ${{ inputs.markets || 'AU,US' }}
+          FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
+        run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled
+
+      - name: Save data for the next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cache
+          key: market-cache-${{ github.run_id }}
+
+      - name: Prepare site
+        run: |
+          mkdir -p site/history
+          cp output/asx_dashboard_latest.html site/index.html
+          cp output/history/*.csv site/history/ 2>/dev/null || true
+          echo "Built $(date -u '+%Y-%m-%d %H:%M UTC')" > site/built.txt
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
