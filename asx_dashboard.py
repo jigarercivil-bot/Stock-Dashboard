@@ -1194,10 +1194,16 @@ def load_market(mkt: str):
         return None
 
 
+# GoatCounter site code for the public view counter (https://<code>.goatcounter.com).
+# Leave empty to turn the counter off. GOATCOUNTER_SITE in the environment overrides it.
+GOATCOUNTER_SITE = ""
+
+
 def build_html(markets: list[dict], scheduled: bool = False) -> str:
     payload = {"generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
                "generatedUtc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-               "scheduled": scheduled, "markets": markets}
+               "scheduled": scheduled, "markets": markets,
+               "counter": re.sub(r"[^a-z0-9-]", "", (os.environ.get("GOATCOUNTER_SITE") or GOATCOUNTER_SITE).strip().lower())}
     data = json.dumps(payload, separators=(",", ":"), allow_nan=False).replace("</", "<\\/")
     return TEMPLATE.read_text(encoding="utf-8").replace("/*__DATA__*/null", data)
 

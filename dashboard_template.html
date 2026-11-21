@@ -178,6 +178,9 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 .topline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
 .views{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 .syncwrap{position:relative;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.viewcount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2)}
+.viewcount[hidden]{display:none!important}
+@media (max-width:640px){.viewcount{padding:8px 10px;font-size:12px}}
 .synccount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer}
 .synccount b{color:var(--text)}
 .synccount .sdot{width:8px;height:8px;border-radius:50%}
@@ -437,6 +440,7 @@ details.panel>summary{cursor:pointer}
     <div class="topline">
       <div class="pagetag" id="pagetag"></div>
       <div class="syncwrap">
+        <span class="viewcount" id="viewcount" hidden title="Visits to this dashboard, counted by GoatCounter"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span id="viewnum"></span></span>
         <button class="synccount" id="synccount" aria-controls="syncpop"></button>
         <button class="syncbtn" id="syncbtn" aria-expanded="false" aria-controls="syncpop"><span class="sdot"></span><span id="synctext"></span></button>
         <div class="syncpop" id="syncpop" hidden></div>
@@ -579,6 +583,14 @@ details.panel>summary{cursor:pointer}
 
 <script>
 const D = /*__DATA__*/null;
+(function viewCounter(){ const site=D&&D.counter; if(!site||location.protocol==="file:") return;
+  const base=`https://${site}.goatcounter.com`;
+  const sc=document.createElement("script"); sc.async=true; sc.src="https://gc.zgo.at/count.js";
+  sc.dataset.goatcounter=base+"/count"; document.head.appendChild(sc);
+  fetch(base+"/counter/TOTAL.json").then(r=>r.ok?r.json():null).then(j=>{ if(!j||j.count==null) return;
+    const n=String(j.count).replace(/[^0-9]/g,""); if(!n) return;
+    document.getElementById("viewnum").textContent=Number(n).toLocaleString("en-AU")+(n==="1"?" view":" views");
+    document.getElementById("viewcount").hidden=false; }).catch(()=>{}); })();
 </script>
 <script>
 (function(){
