@@ -195,6 +195,8 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 .syncpop .row:last-of-type{border-bottom:0}
 .syncpop .row span:first-child{color:var(--text-2)}
 .syncpop .row span:last-child{font-weight:700;text-align:right}
+@media (max-width:640px){ .syncpop{position:fixed;left:10px;right:10px;top:10px;width:auto;max-height:88vh;overflow:auto} }
+.app{overflow-x:clip}
 .syncpop .warn{margin-top:8px;padding:8px 10px;border-radius:9px;background:var(--brass-soft);color:var(--text)}
 .views button{border:0;background:none;padding:7px 16px;border-radius:9px;cursor:pointer;font-weight:700;font-size:13.5px;color:var(--text-2)}
 .views button[aria-pressed=true]{background:var(--brass);color:var(--brass-ink)}
@@ -1662,8 +1664,8 @@ function isStale(m,now){ if(!D.scheduled) return false; const last=schedAt(m.id,
   return !!(last&&b&&now-last>2*36e5&&b<last-36e5); }
 function syncHealth(m){ const st=m.stats||{}, f=st.fund||{}, now=new Date();
   const pr=st.listed?st.priced/st.listed:1;
-  if(pr<0.9||(f.tried>10&&f.fetched===0)) return {cls:"bad-dot",label:"problem"};
-  if(pr<0.98||f.stopped||(f.failed>5&&f.failed>f.fetched)||isStale(m,now)) return {cls:"warn-dot",label:"partial"};
+  if(pr<0.85||(f.tried>10&&f.fetched===0)) return {cls:"bad-dot",label:"problem"};
+  if(pr<0.95||f.stopped==="yahoo"||(f.failed>5&&f.failed>f.fetched)||isStale(m,now)) return {cls:"warn-dot",label:"partial"};
   return {cls:"ok-dot",label:"ok"}; }
 function renderSync(){
   const now=new Date(), t=D.generatedUtc?new Date(D.generatedUtc):null;
@@ -1685,12 +1687,14 @@ function renderSync(){
     pop.append(el("div",{class:"mk"},el("span",{class:"sdot "+h.cls,style:"display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px"}),`${m.name} (${m.exchange})`));
     if(b) pop.append(row("Updated",`${short(b)}, ${ago(now-b)}`, isStale(m,now)?"warnrow":""));
     pop.append(row("Prices",`Close of ${fmtDate(m.marketDate,{weekday:"short",day:"numeric",month:"short"})}`));
-    if(st.listed) pop.append(row("Companies priced",`${(st.priced||0).toLocaleString()} of ${st.listed.toLocaleString()} listed`, st.priced/st.listed<0.9?"bad":st.priced/st.listed<0.98?"warnrow":""));
-    pop.append(row("Financials on file",f.scope?`${(f.covered??nf).toLocaleString()} of ${f.scope.toLocaleString()} in scope`:`${nf.toLocaleString()} companies`, f.scope&&(f.covered??nf)/f.scope<0.9?"warnrow":""));
+    if(st.listed) pop.append(row("Companies priced",`${(st.priced||0).toLocaleString()} of ${st.listed.toLocaleString()} listed`, st.priced/st.listed<0.85?"bad":st.priced/st.listed<0.95?"warnrow":""));
+    pop.append(row("Financials on file",f.scope?`${(f.covered??nf).toLocaleString()} of ${f.scope.toLocaleString()} in scope`:`${nf.toLocaleString()} companies`, f.scope&&(f.covered??nf)/f.scope<0.9&&f.stopped==="yahoo"?"warnrow":""));
+    if(f.scope&&(f.covered??nf)<f.scope&&f.stopped!=="yahoo") pop.append(el("div",{class:"note",text:"Still filling in: each run adds more until every company in scope is covered."}));
     if(f.tried!=null) pop.append(row("That run",`${f.fetched} fetched`+(f.failed?`, ${f.failed} failed`:"")+(f.due>f.tried?`, ${(f.due-f.tried).toLocaleString()} still to do`:""), f.failed>f.fetched&&f.failed>5?"bad":""));
     if(D.scheduled){ const nx=schedAt(m.id,now,1); if(nx) pop.append(row("Next update",short(nx))); }
     if(f.stopped==="yahoo") pop.append(el("div",{class:"note",text:"Yahoo limited downloads, so that run stopped early. The rest come on the next runs."}));
-    else if(f.stopped==="time") pop.append(el("div",{class:"note",text:"Reached that run's time limit for financials. The rest come on the next runs."}));
+    else if(f.stopped==="time"&&!(f.scope&&(f.covered??nf)<f.scope)) pop.append(el("div",{class:"note",text:"Reached that run's time limit for refreshing financials. The rest are refreshed on the next runs."}));
+    if(st.listed&&st.priced<st.listed) pop.append(el("div",{class:"note",text:`${(st.listed-st.priced).toLocaleString()} listed codes had no price from Yahoo, usually new listings, delistings or securities it doesn't track.`}));
     if(isStale(m,now)) pop.append(el("div",{class:"warn",text:`The ${short(schedAt(m.id,now,-1))} ${m.name} update hasn't arrived. Check the Actions tab on GitHub, or start a run there with "Run workflow".`})); });
   pop.append(el("div",{class:"note",style:"margin-top:10px",text: D.scheduled
     ? "The ASX updates at 5pm Sydney time, after its 4pm close, and the US after New York's close (the next Sydney morning), Monday to Friday. GitHub sometimes starts a run up to 30 minutes late. Times are in your local time zone."
