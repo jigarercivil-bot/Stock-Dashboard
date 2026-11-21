@@ -174,7 +174,21 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 .links{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:13px;font-weight:600}
 
 /* ---------- views + value finder ---------- */
-.views{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:22px}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+.views{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.syncwrap{position:relative}
+.syncbtn{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2)}
+.syncbtn:hover{border-color:var(--line-2);color:var(--text)}
+.syncbtn .sdot{width:8px;height:8px;border-radius:50%;background:var(--up);box-shadow:0 0 0 3px var(--up-soft)}
+.syncbtn.stale .sdot{background:var(--brass);box-shadow:0 0 0 3px var(--brass-soft)}
+.syncbtn b{color:var(--text);font-weight:700}
+.syncpop{position:absolute;right:0;top:calc(100% + 8px);width:min(340px,90vw);z-index:45;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.35);font-size:13px}
+.syncpop h4{font:500 18px/1.2 var(--display);margin:0 0 2px}
+.syncpop .row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.syncpop .row:last-of-type{border-bottom:0}
+.syncpop .row span:first-child{color:var(--text-2)}
+.syncpop .row span:last-child{font-weight:700;text-align:right}
+.syncpop .warn{margin-top:8px;padding:8px 10px;border-radius:9px;background:var(--brass-soft);color:var(--text)}
 .views button{border:0;background:none;padding:7px 16px;border-radius:9px;cursor:pointer;font-weight:700;font-size:13.5px;color:var(--text-2)}
 .views button[aria-pressed=true]{background:var(--brass);color:var(--brass-ink)}
 .presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:16px}
@@ -282,7 +296,13 @@ input[type=range]{width:100%;accent-color:var(--brass)}
   </aside>
 
   <main>
-    <nav class="views" id="views" aria-label="View"><button data-v="moves">Today's moves</button><button data-v="value">Value finder</button></nav>
+    <div class="topline">
+      <nav class="views" id="views" aria-label="View"><button data-v="moves">Today's moves</button><button data-v="value">Value finder</button></nav>
+      <div class="syncwrap">
+        <button class="syncbtn" id="syncbtn" aria-expanded="false" aria-controls="syncpop"><span class="sdot"></span><span id="synctext"></span></button>
+        <div class="syncpop" id="syncpop" hidden></div>
+      </div>
+    </div>
     <header class="hero">
       <div>
         <div class="kicker" id="kicker"></div>
@@ -1019,6 +1039,38 @@ let rt; addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if
 $("views").querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(S.view===b.dataset.v) return; S.view=b.dataset.v; S.page=0; render(); scrollTo({top:0}); });
 $("vclear").onclick=()=>{ S.vf.f={}; markCustom(); S.vf.page=0; renderValueControls(); renderValueResults(); };
 
+
+// ---------- last sync ----------
+const SCHED_UTC={h:22,m:17,days:[1,2,3,4,5]};   // must match .github/workflows/build.yml
+function lastScheduled(now){ const d=new Date(now); d.setUTCHours(SCHED_UTC.h,SCHED_UTC.m,0,0);
+  for(let i=0;i<8;i++){ if(d<=now&&SCHED_UTC.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()-1); } return null; }
+function nextScheduled(now){ const d=new Date(now); d.setUTCHours(SCHED_UTC.h,SCHED_UTC.m,0,0);
+  for(let i=0;i<8;i++){ if(d>now&&SCHED_UTC.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()+1); } return null; }
+function ago(ms){ const m=Math.round(ms/6e4); if(m<60) return m<=1?"just now":`${m} minutes ago`; const h=Math.round(m/60); if(h<48) return `${h} hour${h===1?"":"s"} ago`; return `${Math.round(h/24)} days ago`; }
+function renderSync(){
+  const t=D.generatedUtc?new Date(D.generatedUtc):null, now=new Date();
+  const short=d=>d.toLocaleString("en-AU",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+  const long=d=>d.toLocaleString("en-AU",{weekday:"long",day:"numeric",month:"long",hour:"numeric",minute:"2-digit"});
+  const last=D.scheduled?lastScheduled(now):null;
+  const stale=!!(t&&last&&now-last>2*36e5&&t<last-36e5);
+  const btn=$("syncbtn"); btn.classList.toggle("stale",stale);
+  $("synctext").replaceChildren("Last updated ", el("b",{text:t?short(t):D.generated}));
+  const pop=$("syncpop"); pop.replaceChildren(el("h4",{text:"Data sync"}),
+    el("div",{class:"note",style:"margin-bottom:8px",text:t?`${long(t)}, ${ago(now-t)}`:`Built ${D.generated}`}));
+  D.markets.forEach(m=>{ const nf=Object.keys(m.fund||{}).length;
+    pop.append(el("div",{class:"row"},el("span",{text:`${m.name} prices`}),el("span",{text:"Close of "+fmtDate(m.marketDate,{weekday:"short",day:"numeric",month:"short"})})),
+      el("div",{class:"row"},el("span",{text:`${m.name} financials`}),el("span",{text:`${nf.toLocaleString()} companies`}))); });
+  if(D.scheduled){ const nx=nextScheduled(now);
+    if(nx) pop.append(el("div",{class:"row"},el("span",{text:"Next automatic update"}),el("span",{text:long(nx)})));
+    pop.append(el("div",{class:"note",style:"margin-top:6px",text:"Runs every weekday after both markets close. GitHub sometimes starts it up to 30 minutes late."})); }
+  else pop.append(el("div",{class:"note",style:"margin-top:6px",text:"Built on this computer. Run run_dashboard.bat to update."}));
+  if(stale) pop.append(el("div",{class:"warn",text:`The ${short(last)} update hasn't arrived yet. Check the Actions tab on GitHub, or start a run there with "Run workflow".`}));
+  pop.append(el("div",{class:"note",style:"margin-top:8px",text:"Times are in your local time zone."}));
+}
+$("syncbtn").addEventListener("click",e=>{ e.stopPropagation(); const p=$("syncpop"), open=p.hidden; if(open) renderSync(); p.hidden=!open; $("syncbtn").setAttribute("aria-expanded",String(open)); });
+document.addEventListener("click",e=>{ if(!$("syncpop").hidden&&!e.target.closest(".syncwrap")){ $("syncpop").hidden=true; $("syncbtn").setAttribute("aria-expanded","false"); } });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("syncpop").hidden){ $("syncpop").hidden=true; $("syncbtn").setAttribute("aria-expanded","false"); $("syncbtn").focus(); } });
+renderSync();
 loadMarket(D.markets.some(m=>m.id==="AU")?"AU":D.markets[0].id); S=DEFAULT(); render();
 })();
 </script>

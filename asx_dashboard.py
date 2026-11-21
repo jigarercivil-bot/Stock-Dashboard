@@ -34,7 +34,7 @@ import sys
 import time
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -826,8 +826,10 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
 
 
 # ------------------------------------------------------------------ output ---
-def build_html(markets: list[dict]) -> str:
-    payload = {"generated": datetime.now().strftime("%Y-%m-%d %H:%M"), "markets": markets}
+def build_html(markets: list[dict], scheduled: bool = False) -> str:
+    payload = {"generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+               "generatedUtc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+               "scheduled": scheduled, "markets": markets}
     data = json.dumps(payload, separators=(",", ":"), allow_nan=False).replace("</", "<\\/")
     return TEMPLATE.read_text(encoding="utf-8").replace("/*__DATA__*/null", data)
 
@@ -867,7 +869,7 @@ def main():
         if not markets:
             sys.exit("No market could be built. Check your internet connection and try again in a few minutes.")
 
-    html = build_html(markets)
+    html = build_html(markets, scheduled=args.scheduled)
     latest = OUT / "asx_dashboard_latest.html"
     latest.write_text(html, encoding="utf-8")
     if not args.mock:
