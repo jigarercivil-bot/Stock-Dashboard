@@ -1137,6 +1137,30 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
              "fund": {"scope": int(len(m) * 0.9), "due": 300, "tried": 260, "fetched": 240, "failed": 20,
                       "stopped": "yahoo", "covered": len(fund)}}
     payload = market_payload(mkt, m, hist, days[-1], fund, idx, "Synthetic test data — not real prices.", stats)
+    if mkt == "AU":
+        heads = {"Results": "Half Year Results and Investor Presentation", "Capital raising": "A$45M placement to fund expansion",
+                 "Takeover": "Scheme Implementation Deed signed", "Guidance": "FY27 guidance upgrade", "Exploration": "High-grade drill results at main project",
+                 "Contract": "Award of 7-year services contract", "Price query": "Response to ASX price query", "Other": "Change of Director's Interest Notice",
+                 "AGM": "AGM Chair's Address", "Dividend": "Dividend/Distribution announcement"}
+        anns = []
+        movers_ = m.reindex(m["chg"].abs().sort_values(ascending=False).index)["code"].tolist()
+        for i, code in enumerate(movers_[:60] + m.sample(120, random_state=seed)["code"].tolist()):
+            kind = rng.choice(list(heads)) if i % 3 else "Other"
+            anns.append({"t": f"{rng.randint(8, 18):02d}:{rng.randint(0, 59):02d}", "code": code, "head": heads[kind], "kind": kind,
+                         "ps": kind not in ("Other", "AGM") and rng.random() < 0.8})
+        payload["announcements"] = anns
+        hc = m.sample(5, random_state=seed + 1)["code"].tolist()
+        nxt = pd.bdate_range(days[-1], periods=4)
+        payload["halts"] = [{"code": hc[0], "since": days[-1].strftime("%Y-%m-%d"), "time": "09:58", "head": "Trading Halt", "kind": "halt", "resumeBy": nxt[2].strftime("%Y-%m-%d")},
+                            {"code": hc[1], "since": days[-1].strftime("%Y-%m-%d"), "time": "12:20", "head": "Trading Halt", "kind": "halt", "resumeBy": nxt[2].strftime("%Y-%m-%d")},
+                            {"code": hc[2], "since": days[-2].strftime("%Y-%m-%d"), "time": "09:01", "head": "Trading Halt", "kind": "halt", "resumeBy": nxt[1].strftime("%Y-%m-%d")},
+                            {"code": hc[3], "since": days[-6].strftime("%Y-%m-%d"), "time": "09:30", "head": "Suspension from Quotation", "kind": "suspension"}]
+    ts = int((days[-1] + pd.Timedelta(days=3)).timestamp())
+    for i, (code, f) in enumerate(list(fund.items())[:400]):
+        if i % 23 == 0:
+            f["exDividendDate"], f["lastDividendValue"] = ts + 86400 * (i % 5), round(rng.uniform(0.05, 1.2), 3)
+        if i % 37 == 0:
+            f["earningsTimestampStart"] = ts + 86400 * (i % 4)
     if mkt == "US":
         picks = m.sort_values("mcap", ascending=False).head(45)
         w = [rng.uniform(0.2, 1) ** 3 for _ in range(len(picks))]
@@ -1180,7 +1204,7 @@ def build_html(markets: list[dict], scheduled: bool = False) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description="Build the Stock Dashboard (ASX + US)")
-    ap.add_argument("--markets", default="AU,US", help="comma list of AU, US (default both)")
+    ap.add_argument("--markets", default="AU,US", help="comma list of AU, US (default both); 'none' rebuilds the page from saved data")
     ap.add_argument("--limit", type=int, help="only the first N tickers per market (testing)")
     ap.add_argument("--no-fundamentals", action="store_true")
     ap.add_argument("--fundamentals-full", action="store_true",
@@ -1198,9 +1222,10 @@ def main():
     OUT.mkdir(exist_ok=True)
     HIST.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    wanted = [x.strip().upper() for x in args.markets.split(",") if x.strip().upper() in MARKETS]
-    if not wanted:
-        sys.exit("--markets must include AU and/or US")
+    page_only = args.markets.strip().lower() == "none"
+    wanted = [] if page_only else [x.strip().upper() for x in args.markets.split(",") if x.strip().upper() in MARKETS]
+    if not wanted and not page_only:
+        sys.exit("--markets must include AU and/or US (or 'none' to rebuild the page from saved data)")
 
     markets = []
     if args.mock:

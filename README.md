@@ -8,25 +8,28 @@ GitHub Pages.
 
 ## What's in it
 
-- **Today's moves** – market map (heatmap by sector), daily summary, top 10 gainers and
-  losers overall, by sector and by company size, sector performance, new 52-week highs and
-  lows, and a sortable table of every stock.
-- **Value finder** – scores each company 0–100 on Value (P/E, EV/EBITDA, price to book,
-  free cash flow yield, EV/sales), Growth, Quality and Balance sheet (debt, net cash,
-  current ratio, Piotroski F-score), ranked against its own sector. Strategy presets,
-  adjustable weights and filters, a "cheap versus strong" chart, red flags, and a scorecard
-  for every company.
+- **Market brief** (home) – the day in a paragraph; **Watch tomorrow** cards (trading halts
+  in place, ex-dividend dates and results due this week, strong rises on heavy volume, quality
+  stocks that fell without news, your watchlist); **biggest moves** with the reason when a
+  company announced something; **announcements that moved prices**; **trading halts and
+  suspensions**; sector moves. Announcements and halts come from the ASX (ASX view only).
+- **Market movers** – market map (heatmap), top movers by sector and company size, new
+  52-week highs and lows, and a sortable table of every stock.
+- **Discover** – scores each company on Value, Growth, Quality and Balance sheet against its
+  sector, with strategies (Balanced, Deep value, Growth at a fair price, Quality at a fair
+  price, Net cash bargains, Quality on sale, Dividend income, Momentum with substance),
+  adjustable weights and filters, a "cheap versus strong" chart and red flags.
 - **Buffett-style** – eight checks drawn from Warren Buffett's shareholder letters and
-  Berkshire's acquisition criteria (consistent profit, high return on equity, little debt,
-  durable margins, real cash earnings, growth, no dilution, sensible price against an
-  estimated value), for both markets. The US view also shows what Berkshire Hathaway owns,
-  from its latest quarterly 13F filing with the SEC, with changes since the previous quarter.
-  Inspired by his published principles; not stocks he has picked.
-- **Company view** – 1-year price chart, 52-week range, key figures, and revenue, profit,
-  cash flow, debt and cash by year.
+  Berkshire's acquisition criteria, for both markets. Inspired by his published principles;
+  not stocks he has picked.
+- **Company page** – score dials, strengths and risks, "is the price reasonable?" in three
+  views, price chart, key figures, financial health, Buffett-style checklist and peers.
+- **Watchlist** and **Portfolio** – saved in your browser on that device (nothing uploaded).
+  The portfolio shows value, today's change, gain on cost, scores and what needs attention.
+- **Berkshire** – Berkshire Hathaway's latest 13F holdings with quarterly changes (US).
 
-Mega caps (ASX over A$100B, US over US$200B) are hidden by default and can be switched on
-in the filters.
+Search any stock with **Ctrl K**. Mega caps (ASX over A$100B, US over US$200B) are hidden
+from the lists by default and can be switched on under Filters.
 
 ## How it runs
 
@@ -37,7 +40,8 @@ market and keeps the other market's last build. Company
 financials are cached between runs (each run fetches up to 600 ASX and 800 US companies),
 so the Value finder's coverage fills in over the first one to two weeks. On GitHub the financials are fetched gently (one company at a time, at most 40 minutes per market) to stay under Yahoo's limits.
 
-To run it now: **Actions → Build Stock Dashboard → Run workflow**.
+To run it now: **Actions → Build Stock Dashboard → Run workflow**. Enter `none` as the
+market to rebuild only the page from the last saved data (about 2 minutes).
 
 ## Running it on your own PC
 

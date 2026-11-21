@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       markets:
-        description: "Markets to rebuild (AU, US or AU,US). The other market keeps its last build."
+        description: "Markets to rebuild (AU, US or AU,US). The other market keeps its last build. 'none' only rebuilds the page (about 2 minutes)."
         default: "AU,US"
         required: false
       fundamentals_full:

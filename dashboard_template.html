@@ -30,6 +30,7 @@
   --tip-bg:#0F1B30;--tip-text:#F1F4FA;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--ui);font-variant-numeric:tabular-nums lining-nums;-webkit-font-smoothing:antialiased}
 button,select,input{font:inherit;color:inherit}
@@ -246,6 +247,114 @@ input[type=range]{width:100%;accent-color:var(--brass)}
 .bigscore b{font:500 44px/1 var(--display);color:var(--brass)}
 #scatter{position:relative}
 @media (max-width:1100px){ .vfgrid{grid-template-columns:1fr} }
+/* ---------- v2 layout ---------- */
+.nav{display:flex;flex-direction:column;gap:12px}
+.nav .brand{margin-bottom:6px}
+.qwrap{position:relative}
+.qsearch{display:flex;align-items:center;gap:8px;border:1px solid var(--line-2);background:var(--bg);border-radius:10px;padding:0 10px;min-height:42px;color:var(--muted);cursor:text}
+.qsearch input{flex:1;border:0;background:transparent;padding:8px 0;min-width:0;outline:none;color:var(--text)}
+.qsearch:focus-within{border-color:var(--brass)}
+.kbd{border:1px solid var(--line-2);border-radius:6px;padding:1px 6px;font-size:11px;color:var(--text-2);white-space:nowrap}
+.qresults{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:50;background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:6px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.qhit{display:grid;grid-template-columns:52px 1fr auto;gap:8px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:8px;border-radius:8px;cursor:pointer;font-size:13px}
+.qhit span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
+.qhit.sel,.qhit:hover{background:var(--panel-2)}
+.qhit .chg{min-width:0;font-size:12px}
+.mktsw{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px}
+.mktsw button{border:0;border-radius:7px;padding:8px 0;font-weight:700;font-size:13px;background:transparent;color:var(--text-2);cursor:pointer;min-height:36px}
+.mktsw button.on{background:var(--brass);color:var(--brass-ink)}
+.navlinks{display:flex;flex-direction:column;gap:2px}
+.navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:var(--text-2);font-weight:600;font-size:14px;text-decoration:none;min-height:24px}
+.navitem:hover{background:var(--panel-2);color:var(--text)}
+.navitem.on{background:var(--brass-soft);color:var(--brass-2)}
+.navcount{margin-left:auto;font-size:11.5px;color:var(--muted);font-weight:700}
+.filters{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel-2)}
+.filters summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--text-2)}
+.filters[open] summary{margin-bottom:12px}
+.filters .fgroup{margin-bottom:14px}
+.filters.dim{opacity:.55}
+.pagetag{font-size:12.5px;font-weight:600;color:var(--muted)}
+.view>section,.view>.panel,.view>.strip,.view>.two,.view>.cgrid{margin-bottom:22px}
+.star{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);border-radius:9px;padding:5px 7px;cursor:pointer;font-weight:700;font-size:13px}
+.star:hover{color:var(--brass-2);border-color:var(--line-2)}
+.star.on{color:var(--brass);border-color:rgba(214,174,98,.45);background:var(--brass-soft)}
+.cactions .star{padding:0 14px;min-height:40px}
+.iconbtn.big{min-height:40px;padding:0 14px;font-size:13.5px}
+.iconbtn.pri{background:var(--brass);border-color:var(--brass);color:var(--brass-ink)}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.wcard{display:flex;flex-direction:column;gap:4px}
+.wc-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.wc-h h3{font-size:15px;margin:0}
+.wcard .note{margin:0 0 4px;line-height:1.4}
+.clist{list-style:none;padding:0;margin:0}
+.crow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+.crow .mut{color:var(--muted)}
+.crow-r{text-align:right;color:var(--text);font-weight:600;white-space:nowrap}
+.crow-s{grid-column:1/-1;font-size:12px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mut{color:var(--muted)}
+.pill.tag{white-space:nowrap;background:transparent}
+td.why{white-space:normal;min-width:200px;max-width:360px;line-height:1.35}
+td.why small{display:block;color:var(--text-2);font-size:12px;margin-top:3px}
+tr.hl td{background:var(--brass-soft)}
+.annbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line-2);background:var(--panel);border-radius:12px;padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+.annbar a{margin-left:auto;font-weight:700;font-size:13px}
+.warnbar{border-color:rgba(255,115,128,.4)}
+.crumbs{display:flex;align-items:center;gap:12px;font-size:13px;margin-bottom:10px}
+.crumb{font-weight:700;text-decoration:none}
+.chead{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:18px}
+.chead h1{margin-top:4px}
+.cactions{display:flex;gap:8px;flex-wrap:wrap}
+.dials{display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center}
+.dial{display:flex;align-items:center;gap:12px;flex:1 1 190px}
+.dial .dn{font-weight:700;font-size:14px}
+.dial .note{max-width:20ch;line-height:1.35}
+.dial-side{flex:1 1 210px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;border-left:1px solid var(--line);padding-left:20px}
+.pill.gold{color:var(--brass-2);border-color:rgba(214,174,98,.45)}
+.pill.redp{color:var(--down);border-color:rgba(255,115,128,.45)}
+.pill.greenp{color:var(--up);border-color:rgba(61,211,155,.45)}
+.cgrid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px}
+.ccol{display:flex;flex-direction:column;gap:16px;min-width:0}
+.ccol>.two{gap:16px}
+.ccol h2{margin-bottom:8px}
+.ccol h3{font-size:13px;margin:12px 0 4px;color:var(--text-2)}
+.rview{display:flex;flex-direction:column;gap:7px;margin-top:16px}
+.rv-h{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}
+.rv-h span{color:var(--brass-2);font-weight:700}
+.rbar{position:relative;height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(61,211,155,.55),var(--line-2) 50%,rgba(255,115,128,.55))}
+.rbar .knob{position:absolute;top:-6px;width:18px;height:18px;border-radius:50%;background:var(--brass);border:3px solid var(--panel);transform:translateX(-50%)}
+.kfig{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kfig>div{background:var(--panel);padding:10px 12px}
+.kfig .k{font-size:12px;color:var(--text-2);font-weight:600}
+.kfig .v{font-size:16px;font-weight:800;margin-top:1px}
+.srl{list-style:none;padding:0;margin:0}
+.srl li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.45}
+.srl li:last-child{border-bottom:0}
+.srl li>span:first-child{font-weight:800}
+details.panel>summary{cursor:pointer}
+.pform h2{margin-bottom:10px}
+.pfrow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.pfrow label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--text-2);flex:1 1 150px}
+.pfrow .iconbtn{flex:0 0 auto}
+.imp{margin-top:12px}
+.imp summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--brass)}
+.imp textarea{width:100%;box-sizing:border-box;margin:8px 0;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--text);padding:8px;font:13px/1.5 var(--ui)}
+.attn{border-color:rgba(255,115,128,.35)}
+.attl{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.5}
+.abar{display:flex;height:16px;gap:2px;border-radius:6px;overflow:hidden;margin:10px 0}
+.aleg{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--text-2)}
+.aleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+@media (max-width:1100px){ .cgrid{grid-template-columns:1fr} .dial-side{border-left:0;padding-left:0} }
+.stack{display:flex;flex-direction:column;gap:16px}
+#view-berkshire .sechead h2{display:none}
+@media (max-width:900px){
+  .nav{gap:10px;padding:14px 12px}
+  .navlinks{flex-direction:row;overflow-x:auto;gap:4px;scrollbar-width:none}
+  .navitem{white-space:nowrap;padding:8px 10px}
+  .navitem svg{display:none}
+  .navcount{margin-left:4px}
+  #srcnote{display:none}
+  .kbd{display:none}
+}
 /* ---------- Buffett tab ---------- */
 .bfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:12px}
 .bfcheck{position:relative;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:12px 14px 12px 46px;cursor:pointer;min-height:96px}
@@ -279,53 +388,59 @@ input[type=range]{width:100%;accent-color:var(--brass)}
 </head>
 <body>
 <div class="app">
-  <aside>
+  <aside class="nav">
     <div class="brand">
       <div class="mark">S</div>
       <div><b>Stock Dashboard</b><span>End-of-day review</span></div>
       <button class="iconbtn" id="theme" title="Switch light or dark">Light</button>
     </div>
-    <div class="fgroup">
-      <span class="flabel">Market</span>
-      <div class="markets" id="markets"></div>
+    <div class="qwrap">
+      <label class="qsearch" for="qsearch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+        <input id="qsearch" type="text" placeholder="Search any stock" autocomplete="off" aria-controls="qresults"><span class="kbd">Ctrl K</span></label>
+      <div class="qresults" id="qresults" role="listbox" hidden></div>
     </div>
-    <div class="fgroup">
-      <label class="flabel" for="search">Find a stock</label>
-      <input type="text" id="search" placeholder="Code or company" autocomplete="off">
-    </div>
-    <div class="fgroup">
-      <span class="flabel">Company size</span>
-      <div class="chips" id="caps"></div>
-      <div class="note" id="capnote" style="margin-top:7px"></div>
-    </div>
-    <div class="fgroup">
-      <label class="flabel" for="minturn">Traded today, at least</label>
-      <select id="minturn"></select>
-      <div class="note" style="margin-top:5px">Keeps thinly traded penny moves out of the lists.</div>
-    </div>
-    <div class="fgroup">
-      <label class="flabel" for="minprice" id="minpricelab">Minimum price</label>
-      <input type="number" id="minprice" min="0" step="0.01" value="0">
-    </div>
-    <div class="fgroup">
-      <span class="flabel">Sectors</span>
-      <div class="checks" id="sectors"></div>
-      <div class="linkbtns"><button class="linkbtn" id="secall">Select all</button><button class="linkbtn" id="secnone">Clear</button></div>
-    </div>
-    <div class="fgroup"><button class="iconbtn" id="reset" style="width:100%">Reset filters</button></div>
+    <div class="mktsw" id="mktsw" role="group" aria-label="Market"></div>
+    <nav class="navlinks" id="navlinks" aria-label="Sections"></nav>
+    <details class="filters" id="filters">
+      <summary>Filters for lists</summary>
+      <div class="fgroup">
+        <label class="flabel" for="search">Name contains</label>
+        <input type="text" id="search" placeholder="Code or company" autocomplete="off">
+      </div>
+      <div class="fgroup">
+        <span class="flabel">Company size</span>
+        <div class="chips" id="caps"></div>
+        <div class="note" id="capnote" style="margin-top:7px"></div>
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="minturn">Traded today, at least</label>
+        <select id="minturn"></select>
+        <div class="note" style="margin-top:5px">Keeps thinly traded penny moves out of the lists.</div>
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="minprice" id="minpricelab">Minimum price</label>
+        <input type="number" id="minprice" min="0" step="0.01" value="0">
+      </div>
+      <div class="fgroup">
+        <span class="flabel">Sectors</span>
+        <div class="checks" id="sectors"></div>
+        <div class="linkbtns"><button class="linkbtn" id="secall">Select all</button><button class="linkbtn" id="secnone">Clear</button></div>
+      </div>
+      <div class="fgroup"><button class="iconbtn" id="reset" style="width:100%">Reset filters</button></div>
+    </details>
     <div class="note" id="srcnote"></div>
   </aside>
 
   <main>
     <div class="topline">
-      <nav class="views" id="views" aria-label="View"><button data-v="moves">Today's moves</button><button data-v="value">Value finder</button><button data-v="buffett">Buffett-style</button></nav>
+      <div class="pagetag" id="pagetag"></div>
       <div class="syncwrap">
         <button class="synccount" id="synccount" aria-controls="syncpop"></button>
         <button class="syncbtn" id="syncbtn" aria-expanded="false" aria-controls="syncpop"><span class="sdot"></span><span id="synctext"></span></button>
         <div class="syncpop" id="syncpop" hidden></div>
       </div>
     </div>
-    <header class="hero">
+    <header class="hero" id="hero">
       <div>
         <div class="kicker" id="kicker"></div>
         <h1 id="headline"></h1>
@@ -334,7 +449,19 @@ input[type=range]{width:100%;accent-color:var(--brass)}
       <div class="meta" id="countline"></div>
     </header>
 
-    <div id="view-moves">
+    <div id="view-brief" class="view"></div>
+    <div id="view-company" class="view" hidden></div>
+    <div id="view-watch" class="view" hidden></div>
+    <div id="view-portfolio" class="view" hidden></div>
+    <div id="view-berkshire" class="view" hidden>
+      <section id="sec-berkshire">
+        <div class="sechead"><div><h2>What Berkshire Hathaway owns</h2><p id="brknote"></p></div>
+          <button class="linkbtn" id="brksold"></button></div>
+        <div class="strip" id="brktiles"></div>
+        <div class="panel"><div class="tblwrap" id="brktable"></div></div>
+      </section>
+    </div>
+    <div id="view-moves" hidden>
     <div class="strip" id="strip"></div>
 
     <section id="sec-map">
@@ -441,17 +568,11 @@ input[type=range]{width:100%;accent-color:var(--brass)}
         <div class="sechead"><div><h2>Shortlist</h2><p id="bfnote"></p></div></div>
         <div class="panel"><div class="tblwrap" id="bftable"></div><div class="pager" id="bfpager"></div></div>
       </section>
-      <section id="sec-berkshire" hidden>
-        <div class="sechead"><div><h2>What Berkshire Hathaway owns</h2><p id="brknote"></p></div>
-          <button class="linkbtn" id="brksold"></button></div>
-        <div class="strip" id="brktiles"></div>
-        <div class="panel"><div class="tblwrap" id="brktable"></div></div>
-      </section>
+
     </div>
   </main>
 </div>
 
-<dialog id="dlg" aria-label="Company details"><div class="dlg" id="dlgbody"></div></dialog>
 <div id="tip" role="tooltip"></div>
 
 <script>
@@ -511,7 +632,7 @@ const TURN_STEPS={ "A$":[0,20e3,50e3,100e3,500e3,1e6,5e6], "US$":[0,100e3,500e3,
 const TURN_DEFAULT={ "A$":100e3, "US$":1e6 };
 const DEFAULT=()=>({ search:"", minTurn:TURN_DEFAULT[CUR]??0, minPrice:0,
   caps:new Set(CAP_ORDER.filter(c=>c!=="Mega")), sectors:new Set(SECTORS),
-  secMetric:S?S.secMetric:"median", mapSize:S?S.mapSize:"mcap", view:S?S.view:"moves", vf:S?S.vf:defaultVF(), bf:S?S.bf:defaultBF(), capTab:null, bySec:null, byGrp:"", sortKey:"chg", sortDir:-1, page:0 });
+  secMetric:S?S.secMetric:"median", mapSize:S?S.mapSize:"mcap", view:S?S.view:"brief", company:null, vf:S?S.vf:defaultVF(), bf:S?S.bf:defaultBF(), capTab:null, bySec:null, byGrp:"", sortKey:"chg", sortDir:-1, page:0 });
 let S=null;
 
 function filtered(){ const q=S.search.trim().toLowerCase();
@@ -525,12 +646,7 @@ function capRange(name){ const b=M.capBuckets,i=b.findIndex(x=>x.name===name); i
 
 // ---------- sidebar ----------
 function buildSidebar(){
-  const mk=$("markets"); mk.replaceChildren();
-  ALL_MARKETS.forEach(m=>{ const have=D.markets.some(x=>x.id===m.id);
-    const b=el("button",{class:"mkt","aria-pressed":String(m.id===M.id),disabled:have?null:"", title: have? "" : "Not in this build"},
-      el("span",{class:"flag",text:m.flag}), el("span",null, el("span",{class:"t",text:m.label}), el("span",{class:"s",text: have? m.sub : (m.id==="IN"?"Not added yet":"Not in this build (run with --markets "+m.id+")")})));
-    if(have) b.onclick=()=>{ if(m.id!==M.id){ loadMarket(m.id); S=DEFAULT(); render(); scrollTo({top:0}); } };
-    mk.append(b); });
+  renderMarketSwitch(); renderNav();
   const caps=$("caps"); caps.replaceChildren(); const counts={}; rows.forEach(r=>counts[r.cap]=(counts[r.cap]||0)+1);
   CAP_ORDER.forEach(c=>{ if(!counts[c]) return;
     const b=el("button",{class:"chip","aria-pressed":String(S.caps.has(c)),title:capRange(c)+", "+counts[c]+" stocks",text:c});
@@ -557,8 +673,11 @@ function spark(vals,color){ const w=200,h=30; const v=vals.filter(isNum); const 
   s.append(sv("path",{d:"M"+pts.map(p=>p.join(",")).join("L"),fill:"none",stroke:color,"stroke-width":1.8,"vector-effect":"non-scaling-stroke","stroke-linejoin":"round"}));
   return s; }
 function renderHero(list){
-  if(S.view==="value"){ $("kicker").textContent=`${M.name}, fundamentals`; $("headline").textContent="Value finder"; return; }
+  if(S.view==="value"){ $("kicker").textContent=`${M.name}, fundamentals`; $("headline").textContent="Discover"; return; }
   if(S.view==="buffett"){ $("kicker").textContent=`${M.name}, quality at a sensible price`; $("headline").textContent="Buffett-style screen"; return; }
+  if(S.view==="watch"){ $("kicker").textContent=`${M.name}, saved in this browser`; $("headline").textContent="Watchlist"; $("countline").textContent=""; return; }
+  if(S.view==="portfolio"){ $("kicker").textContent=`${M.name}, saved in this browser`; $("headline").textContent="Portfolio"; $("countline").textContent=""; return; }
+  if(S.view==="berkshire"){ $("kicker").textContent="Berkshire Hathaway, 13F filing"; $("headline").textContent="What Berkshire owns"; $("countline").textContent=""; return; }
   $("kicker").textContent = `${M.name}, close of trade`;
   $("headline").textContent = fmtDate(M.marketDate);
   const m=movers(list), adv=m.filter(r=>r.chg>0).length, dec=m.filter(r=>r.chg<0).length;
@@ -649,8 +768,10 @@ function renderSectors(list){
     const row=el("div",{class:"row",role:"button",tabindex:"0"}, el("div",{class:"lab",text:x.s}), track, el("div",{class:"val "+cls(v),text:pct(v)}), el("div",{class:"ad",text:`${x.adv} up, ${x.dec} down`}));
     const tt=`${x.s}\nMedian ${pct(x.med)}, cap-weighted ${pct(x.capw)}\n${x.adv} rose and ${x.dec} fell of ${x.n} traded`+(x.best?`\nBest ${x.best.code} ${pct(x.best.chg)}`:"")+(x.worst?`\nWorst ${x.worst.code} ${pct(x.worst.chg)}`:"");
     row.onmousemove=e=>showTip(e,tt); row.onmouseleave=hideTip;
-    const go=()=>{ hideTip(); S.bySec=x.s; S.byGrp=""; renderBySector(filtered()); $("sec-bysector").scrollIntoView({behavior:"smooth",block:"start"}); };
-    row.onclick=go; row.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } };
+    const goSec=()=>{ hideTip(); S.bySec=x.s; S.byGrp="";
+      if(S.view!=="moves"){ S.pendingSec=true; go("moves"); return; }
+      renderBySector(filtered()); $("sec-bysector").scrollIntoView({behavior:"smooth",block:"start"}); };
+    row.onclick=goSec; row.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); goSec(); } };
     host.append(row); }); }
 
 function renderBySector(list){
@@ -751,50 +872,6 @@ function links(r,f){ const c=r.code;
   if(f&&f.website) L.push(["Company website",f.website]);
   return el("div",{class:"links"},...L.map(([t,u])=>el("a",{href:u,target:"_blank",rel:"noopener",text:t+" ↗"}))); }
 
-function openCompany(code){
-  const r=byCode.get(code); if(!r) return; const f=M.fund[code], body=$("dlgbody"), later=[]; body.replaceChildren();
-  body.append(el("div",{class:"dlghead"},
-    el("div",null, el("div",{class:"kicker",text:`${M.exchange.split(" ")[0]}: ${r.code}`}), el("h2",{text:r.name}),
-      el("div",{class:"sub",text:`${r.sector}, ${r.group}. ${r.cap} cap at ${money(r.mcap)}.`})),
-    el("button",{class:"iconbtn",text:"Close",onclick:()=>$("dlg").close()})));
-  body.append(el("div",{class:"pxrow"}, el("span",{class:"px",text:CUR+price(r.price)}), chgNode(r.traded?r.chg:null),
-    el("span",{class:"note",text: r.traded? `Turnover ${money(r.turnover)}`+(isNum(r.relvol)?`, ${r.relvol.toFixed(1)}× its usual volume`:"") : "Did not trade today"})));
-  if(isNum(r.hi52)&&isNum(r.lo52)&&r.hi52>r.lo52){ const p=Math.min(100,Math.max(0,(r.price-r.lo52)/(r.hi52-r.lo52)*100));
-    const fill=el("div",{class:"fill"}); fill.style.width=p+"%"; const knob=el("div",{class:"knob"}); knob.style.left=p+"%";
-    body.append(el("div",{class:"range",title:`${p.toFixed(0)}% of the way from the 52-week low to the high`},fill,knob),
-      el("div",{class:"rangelab"}, el("span",{text:`52-week low ${CUR}${price(r.lo52)}`}), el("span",{text:`52-week high ${CUR}${price(r.hi52)} (${pct(r.offhi,1)} away)`}))); }
-  const pts=parseHist(code), seg=el("div",{class:"seg",style:"margin:18px 0 10px"}), chartHost=el("div");
-  const ranges=[["1M",22],["3M",64],["6M",127],["1Y",9999]]; let cur="6M";
-  const draw=()=>{ const n=ranges.find(x=>x[0]===cur)[1]; lineChart(chartHost,pts.slice(-n-1),Math.max(280,chartHost.clientWidth||body.clientWidth-52)); };
-  ranges.forEach(([lab])=>{ const b=el("button",{"aria-pressed":String(lab===cur),text:lab}); b.onclick=()=>{ cur=lab; [...seg.children].forEach(c=>c.setAttribute("aria-pressed",String(c.textContent===cur))); draw(); }; seg.append(b); });
-  body.append(seg,chartHost);
-  body.append(el("div",{class:"stats"}, stat("5 days",pct(r.d5),cls(r.d5)), stat("1 month",pct(r.m1),cls(r.m1)), stat("3 months",pct(r.m3),cls(r.m3)),
-    stat("Year to date",pct(r.ytd),cls(r.ytd)), stat("Volume",isNum(r.vol)?r.vol.toLocaleString("en-AU"):"—"), stat("Previous close",CUR+price(r.prev))));
-  if(!f){ body.append(el("div",{class:"subh",text:"Fundamentals"}), el("div",{class:"empty",text:"Not fetched yet for this stock. Each run adds fundamentals for the day's movers and a rolling batch of the market; add the code to watchlist.txt to always include it."})); }
-  else {
-    const mm=fm(r); if(mm){ scorecard(body,r); buffettCard(body,r); }
-    body.append(el("div",{class:"subh",text:"Key figures"}));
-    const g=(k,alt)=>mm&&isNum(mm[k])?mm[k]:alt;
-    const debt=g("debt",isNum(f.totalDebt)?f.totalDebt:lastV(f.debt_y)), cash=g("cash",isNum(f.totalCash)?f.totalCash:lastV(f.cash_y));
-    const pe=mm?mm.pe:f.trailingPE, loss=mm&&mm.loss;
-    body.append(el("div",{class:"stats"},
-      stat("P/E",loss?"Loss":isNum(pe)?num(pe,1):"—"), stat("Forward P/E",isNum(mm&&mm.fpe)?num(mm.fpe,1):(isNum(f.forwardPE)?num(f.forwardPE,1):"—")),
-      stat("EV / EBITDA",isNum(mm&&mm.evEbitda)?num(mm.evEbitda,1):"—"), stat("Price to book",isNum(mm&&mm.pb)?num(mm.pb,2):(isNum(f.priceToBook)?num(f.priceToBook,2):"—")),
-      stat("Free cash flow yield",isNum(mm&&mm.fcfY)?pct(mm.fcfY*100,1):"—",cls(mm&&mm.fcfY)), stat("Dividend yield",isNum(mm&&mm.divY)?num(mm.divY*100,2)+"%":"—"),
-      stat("Revenue, last 12 months",money(g("rev",f.totalRevenue))), stat("Free cash flow",money(g("fcf",f.freeCashflow)),cls(g("fcf",f.freeCashflow))),
-      stat("Total debt",money(debt)), stat("Cash",money(cash)), stat("Net debt",isNum(debt)&&isNum(cash)?(debt-cash<0?"Net cash "+money(cash-debt):money(debt-cash)):"—"),
-      stat("Debt to equity",isNum(mm&&mm.de)?num(mm.de,0)+"%":(isNum(f.debtToEquity)?num(f.debtToEquity,0)+"%":"—")), stat("Current ratio",isNum(f.currentRatio)?num(f.currentRatio,2):"—"),
-      stat("Operating margin",isNum(f.operatingMargins)?pct(f.operatingMargins*100,1):"—",cls(f.operatingMargins)), stat("Return on equity",isNum(f.returnOnEquity)?pct(f.returnOnEquity*100,1):"—",cls(f.returnOnEquity)),
-      stat("Revenue growth",isNum(f.revenueGrowth)?pct(f.revenueGrowth*100,1):"—",cls(f.revenueGrowth))));
-    const fg=el("div",{class:"fundgrid"}); body.append(fg);
-    const fxNote=isNum(f.fx)&&f.fx!==1&&f.fin_ccy?` (${f.fin_ccy})`:"";
-    [["Revenue by year",f.rev_y,"Revenue"],["Revenue by quarter",f.rev_q,"Revenue"],["Net income by year",f.ni_y,"Net income"],["Free cash flow by year",f.fcf_y,"Free cash flow"],["Total debt by year",f.debt_y,"Total debt"],["Cash by year",f.cash_y,"Cash"]]
-      .forEach(([t,s,l])=>{ const host=el("div"); fg.append(el("div",{class:"panel"},el("h3",{text:t+fxNote}),host)); later.push(()=>host.replaceChildren(barChart(s,Math.max(220,host.clientWidth),l))); });
-    if(f.summary) body.append(el("p",{class:"summary",text:f.summary}));
-    body.append(el("div",{class:"note",text:`Fundamentals from Yahoo Finance, fetched ${f.fetched}.`+(fxNote?` This company reports in ${f.fin_ccy}; charts are in ${f.fin_ccy}, ratios are converted to ${CUR}.`:"")+(M.id==="AU"?" Most ASX companies report half-yearly, so quarterly figures can be sparse.":"")}));
-  }
-  body.append(links(r,f));
-  $("dlg").showModal(); draw(); later.forEach(fn=>fn()); body.scrollTop=0; }
 
 // ---------- value finder ----------
 const PILLARS=[["v","Value","Cheap against earnings, cash flow, assets and sales"],["g","Growth","How fast revenue and earnings are growing"],["q","Quality","How profitable the business is"],["b","Balance sheet","Debt levels and financial health"]];
@@ -824,13 +901,16 @@ const PRESETS=[
   {id:"garp",name:"Growth at a fair price",desc:"Growing quickly without paying a growth-stock price.",w:{v:30,g:40,q:20,b:10},f:{minRevG:10,maxPEG:1.5,profit:true}},
   {id:"quality",name:"Quality at a fair price",desc:"High returns on capital and modest debt at a sensible price.",w:{v:25,g:15,q:40,b:20},f:{minROE:15,maxDE:100,profit:true}},
   {id:"netcash",name:"Net cash bargains",desc:"More cash than debt, positive cash flow, and still cheap.",w:{v:40,g:10,q:10,b:40},f:{minNetCash:10,fcfPos:true}},
-  {id:"beaten",name:"Beaten-down quality",desc:"Sound businesses whose shares are at least 30% off their high.",w:{v:30,g:10,q:30,b:30},f:{maxOffHi:30,minROE:10,maxDE:100,profit:true}},
+  {id:"beaten",name:"Quality on sale",desc:"Sound businesses whose shares are at least 30% off their high.",w:{v:30,g:10,q:30,b:30},f:{maxOffHi:30,minROE:10,maxDE:100,profit:true}},
+  {id:"dividend",name:"Dividend income",desc:"A yield of 4%+, paid out of real profit and cash flow, with a sound balance sheet.",w:{v:30,g:10,q:30,b:30},f:{minDiv:4,maxPayout:90,profit:true,fcfPos:true}},
+  {id:"momentum",name:"Momentum with substance",desc:"Shares up 15%+ over 3 months, backed by growing revenue and profits.",w:{v:15,g:40,q:30,b:15},f:{minM3:15,minRevG:5,profit:true}},
 ];
 const VF_NUM=[ // id, label, metric, kind, scale
   ["maxPE","Max P/E","pe","max",1],["maxEVE","Max EV / EBITDA","evEbitda","max",1],["maxPB","Max price to book","pb","max",1],
   ["maxPEG","Max PEG ratio","peg","max",1],["minFcfY","Min free cash flow yield, %","fcfY","min",100],["minRevG","Min revenue growth, %","revG","min",100],
   ["minROE","Min return on equity, %","roe","min",100],["maxDE","Max debt to equity, %","de","max",1],["minNetCash","Min net cash, % of market cap","netCash","min",100],
-  ["minF","Min F-score (0–9)","fscore","min",1],["maxOffHi","At least this % below 52-week high","offhi","off",1]];
+  ["minF","Min F-score (0–9)","fscore","min",1],["maxOffHi","At least this % below 52-week high","offhi","off",1],
+  ["minDiv","Min dividend yield, %","divY","min",100],["maxPayout","Max payout ratio, %","payout","max",100],["minM3","Min 3-month return, %","m3","rmin",1]];
 const VF_BOOL=[["profit","Profitable only"],["fcfPos","Positive free cash flow"],["noRed","No red flags"]];
 const defaultVF=()=>({preset:"balanced",w:{...PRESETS[0].w},f:{},rel:"sector",page:0,sortKey:"score",sortDir:-1});
 
@@ -862,6 +942,7 @@ function fm(r){
   m.netCash=isNum(debt)&&isNum(cash)&&isNum(cap)&&cap>0?(cash-debt)/cap:null;
   m.fscore=f.fscore; m.fmax=f.fmax; m.fsN=isNum(f.fscore)&&f.fmax>=6?f.fscore/f.fmax*9:null;
   m.peg=isNum(m.pe)&&isNum(m.epsG)&&m.epsG>0?m.pe/(m.epsG*100):null;
+  m.payout=isNum(f.payoutRatio)?f.payoutRatio:null;
   m.upside=isNum(f.targetMeanPrice)&&f.targetMeanPrice>0?f.targetMeanPrice/P-1:null;
   ["pe","fpe","pb","evEbitda","evSales"].forEach(key=>{ if(isNum(m[key])&&m[key]>1000) m[key]=null; });
   return m;
@@ -877,7 +958,7 @@ function flagsFor(m,ps,r){
   if(isNum(m.cr)&&m.cr<1) red.push("Current ratio under 1: short-term bills exceed short-term assets");
   if(isNum(m.fscore)&&m.fmax>=6&&m.fscore<=3) red.push(`Weak Piotroski score (${m.fscore} of ${m.fmax})`);
   if(ps&&isNum(ps.v)&&ps.v>=70&&((isNum(m.revG)&&m.revG<0)||m.loss)) red.push("Looks cheap but the business is shrinking or losing money: possible value trap");
-  if(isNum(m.netCash)&&m.netCash>0) green.push(`Net cash: ${pct(m.netCash*100,0).slice(1)} of market cap`);
+  if(isNum(m.netCash)&&m.netCash>=0.01) green.push(`Net cash: ${pct(m.netCash*100,0).slice(1)} of market cap`);
   if(isNum(m.fcfY)&&m.fcfY>=0.08) green.push(`Strong cash generation: ${pct(m.fcfY*100,1).slice(1)} free cash flow yield`);
   if(isNum(m.fscore)&&m.fmax>=6&&m.fscore>=7) green.push(`Strong Piotroski score (${m.fscore} of ${m.fmax})`);
   if(isNum(m.roe)&&m.roe>=0.2) green.push(`High return on equity (${pct(m.roe*100,0).slice(1)})`);
@@ -911,6 +992,7 @@ function composite(it){ const w=S.vf.w; let s=0,t=0,n=0,need=0;
 function passes(it){ const f=S.vf.f, m=it.m;
   for(const [id,,metric,kind,scale] of VF_NUM){ const lim=f[id]; if(!isNum(lim)) continue;
     if(kind==="off"){ if(!(isNum(it.r.offhi)&&it.r.offhi<=-lim)) return false; continue; }
+    if(kind==="rmin"){ if(!(isNum(it.r[metric])&&it.r[metric]>=lim)) return false; continue; }
     const v=m[metric]; if(!isNum(v)) return false; const x=v*scale;
     if(kind==="max"&&!(x<=lim&&x>=0)) return false; if(kind==="min"&&!(x>=lim)) return false; }
   if(f.profit&&m.loss!==false) return false;
@@ -1025,7 +1107,7 @@ function scorecard(body,r){
   const vc=scoreAll(), it=vc.items.find(x=>x.r===r); if(!it) return;
   it.score=composite(it); const all=vc.items.map(x=>composite(x)).filter(isNum).sort((a,b)=>b-a);
   const rank=isNum(it.score)?all.findIndex(v=>v<=it.score)+1:null;
-  body.append(el("div",{class:"subh",text:"Value finder scorecard"}));
+  body.append(el("div",{class:"subh",text:"Discover scorecard"}));
   body.append(el("div",{class:"bigscore"},el("b",{text:isNum(it.score)?Math.round(it.score):"—"}),
     el("span",{class:"note",text:isNum(it.score)?`Overall score with your current weights; ranks ${rank} of ${all.length.toLocaleString()} in ${M.name}. Each measure is compared with ${it.pk==="__all"?"the whole market":it.pk+" stocks"}.`:"Not enough data for an overall score."})));
   const med=vc.med[it.pk]||{}, cr=el("div",{class:"cardrow"});
@@ -1127,7 +1209,6 @@ function renderBuffett(){
   const seg=$("bfmin"); seg.replaceChildren(); [8,7,6,5].forEach(n=>{ const b=el("button",{"aria-pressed":String(S.bf.min===n),text:n===8?"All 8":`${n}+`});
     b.onclick=()=>{ S.bf.min=n; S.bf.page=0; renderBuffett(); }; seg.append(b); });
   renderBfTable(pass);
-  const bh=$("sec-berkshire"); bh.hidden=!M.berkshire; if(M.berkshire) renderBerkshire();
 }
 function checkDots(b){ const w=el("span",{class:"dots"}); BUFFETT.forEach(c=>{ const v=b.res[c.id]; w.append(el("i",{class:v===true?"y":v===false?"n":"u",title:`${c.name}: ${v===true?"pass":v===false?"fail":"not enough data"}`})); }); return w; }
 const BFCOLS=[["rank","#","num"],["code","Code"],["name","Company"],["checks","Checks"],["passed","Passed","num"],["roeAvg","Avg ROE","num"],["debtYrs","Debt, years of profit","num"],["omA","Op. margin","num"],["fcfY","FCF yield","num"],["mos","Value vs price","num"],["mcap","Market cap","num"]];
@@ -1194,18 +1275,356 @@ function buffettCard(body,r){
   if(h) body.append(el("p",{class:"note",text:`Berkshire Hathaway held ${h.shares.toLocaleString("en-AU")} shares (${pc1(h.weight/100)} of its US portfolio) on ${fmtDate(B.period,{day:"numeric",month:"short",year:"numeric"})}.`}));
 }
 
+// =====================================================================
+// v2: sections, routing, watchlist, portfolio, market brief, company page
+// =====================================================================
+const VIEWS={brief:"Market brief",moves:"Market movers",value:"Discover",buffett:"Buffett-style",watch:"Watchlist",portfolio:"Portfolio",berkshire:"Berkshire",company:"Company"};
+const store={ get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+let WATCH=store.get("sd-watch",{AU:[],US:[]}); if(!WATCH.AU) WATCH={AU:[],US:[]};
+let PORT=store.get("sd-portfolio",[]); if(!Array.isArray(PORT)) PORT=[];
+const isWatched=code=>(WATCH[M.id]||[]).includes(code);
+function toggleWatch(code){ const a=new Set(WATCH[M.id]||[]); a.has(code)?a.delete(code):a.add(code); WATCH[M.id]=[...a]; store.set("sd-watch",WATCH); renderNavCounts(); }
+const STAR='<svg width="16" height="16" viewBox="0 0 24 24" fill="FILL" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>';
+function starBtn(code,label){ const on=isWatched(code); const b=el("button",{class:"star"+(on?" on":""),type:"button","aria-pressed":String(on),"aria-label":(on?"Remove ":"Add ")+code+(on?" from":" to")+" watchlist",title:on?"In your watchlist":"Add to watchlist"});
+  const paint=()=>{ const o=isWatched(code); b.className="star"+(o?" on":""); b.setAttribute("aria-pressed",String(o)); b.innerHTML=STAR.replace("FILL",o?"currentColor":"none")+(label?`<span>${o?"In watchlist":"Add to watchlist"}</span>`:""); };
+  paint(); b.onclick=e=>{ e.stopPropagation(); toggleWatch(code); paint(); if(S.view==="watch") renderWatch(); }; return b; }
+
+// ---------- routing ----------
+function go(view,code){ const h=`#/${M.id}/${view}`+(code?`/${encodeURIComponent(code)}`:""); if(location.hash!==h) location.hash=h; else applyHash(); }
+function openCompany(code){ hideTip(); go("company",code); }
+function applyHash(){ const p=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean);
+  let mk=p[0], view=p[1], code=p[2]?decodeURIComponent(p[2]):null;
+  if(mk&&D.markets.some(m=>m.id===mk)&&mk!==M.id){ const keep={view:S.view,vf:S.vf,bf:S.bf,secMetric:S.secMetric,mapSize:S.mapSize}; loadMarket(mk); S=DEFAULT(); Object.assign(S,keep); VC=null; BC=null; }
+  if(!VIEWS[view]) view="brief"; if(view==="company"&&!(code&&byCode.get(code))) view="brief";
+  S.view=view; S.company=view==="company"?code:null; const keepSec=S.pendingSec; render(); if(!keepSec) scrollTo({top:0}); }
+addEventListener("hashchange",applyHash);
+
+// ---------- nav + quick search ----------
+function renderNav(){ const n=$("navlinks"); n.replaceChildren();
+  const ico={brief:'<path d="M4 5h16M4 12h16M4 19h10"/>',moves:'<path d="M3 17l5-6 4 4 8-9"/><path d="M14 6h6v6"/>',value:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',buffett:'<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.3l-4.8 2.6.9-5.4L4.2 8.7l5.4-.8z"/>',
+    watch:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',portfolio:'<rect x="3.5" y="7" width="17" height="12.5" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>',berkshire:'<path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6"/>'};
+  ["brief","moves","value","buffett","watch","portfolio","berkshire"].forEach(v=>{
+    const a=el("a",{class:"navitem"+(S.view===v||(v==="value"&&false)?" on":""),href:`#/${M.id}/${v}`,"aria-current":S.view===v?"page":null});
+    a.innerHTML=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ico[v]}</svg>`;
+    a.append(el("span",{text:VIEWS[v]}));
+    if(v==="watch") a.append(el("span",{class:"navcount",id:"watchcount"}));
+    if(v==="portfolio") a.append(el("span",{class:"navcount",id:"portcount"}));
+    n.append(a); });
+  renderNavCounts(); }
+function renderNavCounts(){ const w=$("watchcount"), p=$("portcount"); if(w) w.textContent=(WATCH[M.id]||[]).length||""; if(p) p.textContent=PORT.filter(h=>h.m===M.id).length||""; }
+function renderMarketSwitch(){ const host=$("mktsw"); host.replaceChildren();
+  D.markets.forEach(m=>{ const b=el("button",{type:"button",class:m.id===M.id?"on":"","aria-pressed":String(m.id===M.id),text:m.id==="AU"?"ASX":"US"});
+    b.onclick=()=>{ if(m.id!==M.id){ const h=`#/${m.id}/${S.view==="company"?"brief":S.view}`; location.hash=h; } }; host.append(b); }); }
+function quickSearch(){ const inp=$("qsearch"), box=$("qresults"); let hits=[], sel=0;
+  const draw=()=>{ box.replaceChildren(); if(!hits.length){ box.hidden=true; return; } box.hidden=false;
+    hits.forEach((r,i)=>{ const a=el("button",{type:"button",class:"qhit"+(i===sel?" sel":""),role:"option"},el("b",{text:r.code}),el("span",{text:r.name}),chgNode(r.traded?r.chg:null));
+      a.onmousedown=e=>{ e.preventDefault(); pick(r); }; box.append(a); }); };
+  const pick=r=>{ inp.value=""; hits=[]; draw(); inp.blur(); openCompany(r.code); };
+  inp.addEventListener("input",()=>{ const q=inp.value.trim().toLowerCase(); sel=0;
+    hits=!q?[]:rows.filter(r=>r.code.toLowerCase().startsWith(q)||(r.name||"").toLowerCase().includes(q))
+      .sort((a,b)=>(b.code.toLowerCase()===q)-(a.code.toLowerCase()===q)||(b.code.toLowerCase().startsWith(q))-(a.code.toLowerCase().startsWith(q))||(b.mcap||0)-(a.mcap||0)).slice(0,8); draw(); });
+  inp.addEventListener("keydown",e=>{ if(e.key==="ArrowDown"){ sel=Math.min(sel+1,hits.length-1); draw(); e.preventDefault(); }
+    else if(e.key==="ArrowUp"){ sel=Math.max(sel-1,0); draw(); e.preventDefault(); }
+    else if(e.key==="Enter"&&hits[sel]) pick(hits[sel]); else if(e.key==="Escape"){ inp.value=""; hits=[]; draw(); inp.blur(); } });
+  inp.addEventListener("blur",()=>setTimeout(()=>{ box.hidden=true; },120));
+  document.addEventListener("keydown",e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){ e.preventDefault(); inp.focus(); inp.select(); } }); }
+
+// ---------- shared helpers ----------
+const ANN_COLORS={"Results":"#5B8DEF","Capital raising":"#E58C5A","Takeover":"#B08CF0","Guidance":"#3DBFA8","Exploration":"#D6AE62","Contract":"#3DBFA8","Price query":"#FF8591","Trading halt":"#FF8591","Suspension":"#FF8591","Reinstatement":"#3DBFA8","Dividend":"#9FB3D1","AGM":"#9FB3D1","Other":"#8A97AF","No announcement":"#8A97AF"};
+function annTag(k){ const c=ANN_COLORS[k]||"#8A97AF"; return el("span",{class:"pill tag",style:`color:${c};border-color:${c}55`,text:k}); }
+let ANNIX=null; function annIndex(){ if(ANNIX&&ANNIX.id===M.id) return ANNIX.map; const map=new Map();
+  (M.announcements||[]).forEach(a=>{ if(!map.has(a.code)) map.set(a.code,[]); map.get(a.code).push(a); });
+  map.forEach(l=>l.sort((a,b)=>(b.ps-a.ps)||(b.t>a.t?1:-1))); ANNIX={id:M.id,map}; return map; }
+function mainAnn(code){ const l=annIndex().get(code); if(!l) return null; return l.find(a=>a.ps&&a.kind!=="Other"&&a.kind!=="AGM")||l.find(a=>a.ps)||l.find(a=>a.kind!=="Other"&&a.kind!=="AGM")||null; }
+function nextSession(){ const d=new Date(M.marketDate+"T00:00:00"); do{ d.setDate(d.getDate()+1); }while(d.getDay()===0||d.getDay()===6); return d; }
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const fromEpoch=s=>{ if(!isNum(s)) return null; const d=new Date(s*1000); return isNaN(d)?null:d; };
+function dayLabel(d){ return d.toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short"}); }
+function sectionHead(title,sub,right){ return el("div",{class:"sechead"},el("div",null,el("h2",{text:title}),sub?el("p",{text:sub}):null),right||null); }
+function compactRow(r,right,sub){ return el("li",{class:"crow"},el("span",null,codeBtn(r.code)," ",el("span",{class:"mut",text:r.name})),el("span",{class:"crow-r",text:right||""}),sub?el("span",{class:"crow-s",text:sub}):null); }
+
+// ---------- market brief ----------
+function renderBrief(){
+  const list=filtered(), mv=movers(list), host=$("view-brief"); host.replaceChildren();
+  const AU=M.id==="AU", anns=M.announcements||[], ps=anns.filter(a=>a.ps), halts=(M.halts||[]);
+  const big=mv.filter(r=>Math.abs(r.chg)>=7), nx=nextSession(), nxs=ymd(nx);
+  // hero lede
+  const ix=M.indices[0], adv=mv.filter(r=>r.chg>0).length, dec=mv.filter(r=>r.chg<0).length;
+  const g={}; mv.forEach(r=>(g[r.sector]=g[r.sector]||[]).push(r.chg));
+  const ranked=Object.entries(g).filter(([,a])=>a.length>=5).map(([s,a])=>[s,median(a)]).sort((a,b)=>b[1]-a[1]);
+  const lede=$("lede"); lede.replaceChildren();
+  if(ix) lede.append("The ",el("strong",{text:`${ix.name} ${ix.chg>=0?"rose":"fell"} ${pct(Math.abs(ix.chg)).replace("+","")}`}),". ");
+  lede.append(`${adv.toLocaleString()} stocks rose and ${dec.toLocaleString()} fell`);
+  if(ranked.length>1) lede.append("; ",el("strong",{text:ranked[0][0]})," led and ",el("strong",{text:ranked[ranked.length-1][0]})," lagged");
+  lede.append(". ",el("strong",{text:`${big.length} stocks moved 7% or more`}));
+  if(AU) lede.append(`, ${ps.length} price-sensitive announcements came out`,halts.filter(h=>h.kind==="halt").length?`, and ${halts.filter(h=>h.kind==="halt").length} trading halts are in place`:"");
+  lede.append(".");
+  // strip
+  const strip=el("div",{class:"strip"});
+  M.indices.slice(0,AU?1:2).forEach(ix=>strip.append(el("div",{class:"tile"},el("div",{class:"k",text:ix.name}),el("div",{class:"v",text:num(ix.last,1)}),el("div",{class:"s"},el("span",{class:cls(ix.chg),style:"font-weight:700",text:pct(ix.chg)})," today"),spark(ix.spark,ix.chg>=0?"var(--up-bar)":"var(--down-bar)"))));
+  const br=el("div",{class:"breadth"}), tot=Math.max(1,mv.length);
+  [[adv,"var(--up-bar)"],[mv.length-adv-dec,"var(--line-2)"],[dec,"var(--down-bar)"]].forEach(([n,c])=>{ if(n){ const s=el("span"); s.style.width=(n/tot*100)+"%"; s.style.background=c; br.append(s); } });
+  strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Rose / fell"}),el("div",{class:"v"},el("span",{class:"up",text:adv.toLocaleString()})," / ",el("span",{class:"down",text:dec.toLocaleString()})),br));
+  strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Moved 7% or more"}),el("div",{class:"v"},el("span",{class:"up",text:String(big.filter(r=>r.chg>0).length)})," up / ",el("span",{class:"down",text:String(big.filter(r=>r.chg<0).length)})," down"),el("div",{class:"s",text:`turnover over ${short(S.minTurn||0)}`})));
+  if(AU){ strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Price-sensitive announcements"}),el("div",{class:"v",text:String(ps.length)}),el("div",{class:"s",text:`${anns.length} announcements in all`})));
+    strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Trading halts / suspensions"}),el("div",{class:"v",text:`${halts.filter(h=>h.kind==="halt").length} / ${halts.filter(h=>h.kind!=="halt").length}`}),el("div",{class:"s",text:`${halts.filter(h=>h.kind==="halt"&&h.resumeBy&&h.resumeBy<=nxs).length} due back by ${dayLabel(nx)}`}))); }
+  else { const nh=list.filter(r=>r.newhi).length, nl=list.filter(r=>r.newlo).length;
+    strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"New 52-week highs / lows"}),el("div",{class:"v"},el("span",{class:"up",text:String(nh)})," / ",el("span",{class:"down",text:String(nl)})))); }
+  host.append(strip);
+
+  // watch tomorrow
+  const vc=scoreAll(), byIt=new Map(vc.items.map(it=>[it.r.code,it])), bc=buffettAll().map;
+  const cards=[]; const card=(title,desc,items,fmt,empty)=>{ const ul=el("ul",{class:"clist"}); items.slice(0,5).forEach(x=>ul.append(fmt(x)));
+    cards.push(el("div",{class:"panel wcard"},el("div",{class:"wc-h"},el("h3",{text:title}),el("span",{class:"pill",text:String(items.length)})),el("p",{class:"note",text:desc}),items.length?ul:el("div",{class:"empty",text:empty}))); };
+  if(AU){ const hl=halts.filter(h=>h.kind==="halt").sort((a,b)=>(a.resumeBy||"").localeCompare(b.resumeBy||""));
+    card("Trading halts in place","Usually a pending announcement. They often move sharply when trading resumes.",hl,
+      h=>{ const r=byCode.get(h.code); return el("li",{class:"crow"},el("span",null,r?codeBtn(h.code):el("b",{text:h.code})," ",el("span",{class:"mut",text:r?r.name:""})),el("span",{class:"crow-r",text:h.resumeBy?`back by ${dayLabel(new Date(h.resumeBy+"T00:00:00"))}`:""})); },"No trading halts in place."); }
+  const exd=[], evs=[]; const horizon=new Date(nx); horizon.setDate(horizon.getDate()+6);
+  Object.entries(M.fund||{}).forEach(([code,f])=>{ const r=byCode.get(code); if(!r||!S.caps.has(r.cap)) return;
+    const d=fromEpoch(f.exDividendDate); if(d&&d>=nx&&d<=horizon) exd.push({r,d,f});
+    const e=fromEpoch(f.earningsTimestampStart); if(e&&e>=nx&&e<=horizon) evs.push({r,d:e}); });
+  exd.sort((a,b)=>a.d-b.d); evs.sort((a,b)=>a.d-b.d);
+  card("Going ex-dividend this week","Buy before the ex-date to receive the dividend; the price usually drops by about the dividend on the day.",exd,
+    x=>compactRow(x.r,`${dayLabel(x.d)}`+(isNum(x.f.lastDividendValue)?`, ${CUR}${num(x.f.lastDividendValue,3)}`:"")),"No ex-dividend dates on file for the next week.");
+  card("Results due this week","Scheduled results that often move the price, where the date is known.",evs,x=>compactRow(x.r,dayLabel(x.d)),"No results dates on file for the next week.");
+  const surge=mv.filter(r=>r.chg>=5&&(r.relvol||0)>=3).sort((a,b)=>b.chg-a.chg);
+  card("Strong rise on heavy volume","Up 5% or more on at least 3× its usual volume. A strong move doesn't guarantee a follow-through.",surge,
+    r=>{ const a=AU?mainAnn(r.code):null, it=byIt.get(r.code); return compactRow(r,`${pct(r.chg,1)}, ${num(r.relvol,1)}× vol`,a?`${a.kind}: ${a.head}`:(it&&isNum(composite(it))?`Discover score ${Math.round(composite(it))}`:"")); },"Nothing rose 5%+ on heavy volume.");
+  const dip=mv.filter(r=>{ if(r.chg>-5) return false; if(AU&&mainAnn(r.code)) return false; const it=byIt.get(r.code), b=bc.get(r.code); const sc=it?composite(it):null; return (isNum(sc)&&sc>=60)||(b&&b.passed>=6); })
+    .sort((a,b)=>a.chg-b.chg);
+  card("Quality stocks that fell without news",AU?"Fell 5% or more with no company announcement, while value and quality scores stay high.":"Fell 5% or more while value and quality scores stay high.",dip,
+    r=>{ const it=byIt.get(r.code), b=bc.get(r.code); return compactRow(r,pct(r.chg,1),[it&&isNum(composite(it))?`Score ${Math.round(composite(it))}`:"",b?`Buffett ${b.passed} of ${b.evaluated}`:""].filter(Boolean).join(", ")); },"No quality stocks fell 5%+ today.");
+  const wl=(WATCH[M.id]||[]).map(c=>byCode.get(c)).filter(Boolean).filter(r=>(r.traded&&Math.abs(r.chg)>=5)||(AU&&mainAnn(r.code)));
+  card("Your watchlist","Stocks you follow that moved 5% or more or had news.",wl,r=>{ const a=AU?mainAnn(r.code):null; return compactRow(r,r.traded?pct(r.chg,1):"",a?`${a.kind}: ${a.head}`:""); },
+    (WATCH[M.id]||[]).length?"Nothing notable in your watchlist today.":"Star stocks on their company page to follow them here.");
+  if(!AU){ const bo=list.filter(r=>r.newhi&&(r.relvol||0)>=1.5).sort((a,b)=>b.chg-a.chg);
+    card("Breakouts to a 52-week high","New one-year high on above-average volume.",bo,r=>compactRow(r,pct(r.chg,1),`52-week high ${CUR}${price(r.hi52)}`),"No breakouts today."); }
+  host.append(el("section",null,sectionHead("Watch tomorrow",`What's lined up for the next session (${dayLabel(nx)}), and today's moves worth a second look`),el("div",{class:"wgrid"},...cards)));
+
+  // biggest moves
+  const bigUp=mv.filter(r=>r.chg>=5).sort((a,b)=>b.chg-a.chg), bigDn=mv.filter(r=>r.chg<=-5).sort((a,b)=>a.chg-b.chg);
+  const mvTable=(rs,empty)=>{ if(!rs.length) return el("div",{class:"empty",text:empty}); const t=el("table"),hr=el("tr");
+    [["Company"],["Change","num"],[`Price (${CUR})`,"num"],["Volume vs usual","num"],[AU?"Why it moved":"Sector"]].forEach(([h,c])=>hr.append(el("th",{class:c,text:h})));
+    t.append(el("thead",null,hr)); const tb=el("tbody");
+    rs.slice(0,S.briefAll?40:8).forEach(r=>{ const a=AU?mainAnn(r.code):null;
+      tb.append(el("tr",null,el("td",{class:"nm"},codeBtn(r.code),el("small",{text:r.name})),el("td",{class:"num"},chgNode(r.chg)),el("td",{class:"num",text:price(r.price)}),
+        el("td",{class:"num",style:(r.relvol||0)>=3?"color:var(--brass-2);font-weight:700":"",text:isNum(r.relvol)?num(r.relvol,1)+"×":"—"}),
+        el("td",{class:"why"},AU?annTag(a?a.kind:"No announcement"):el("span",{class:"mut",text:r.sector}),AU?el("small",{text:a?a.head:"Moved without a company announcement today"}):null))); });
+    t.append(tb); return el("div",{class:"tblwrap"},t); };
+  const more=el("button",{class:"linkbtn",text:S.briefAll?"Show fewer":"Show more"}); more.onclick=()=>{ S.briefAll=!S.briefAll; renderBrief(); };
+  host.append(el("section",null,sectionHead("Biggest moves today",`Stocks that moved 5% or more on at least ${short(S.minTurn||0)} turnover${AU?", with the reason when there was one":""}`,more),
+    el("div",{class:"stack"},el("div",{class:"panel"},el("h3",null,el("span",{class:"dot",style:"background:var(--up-bar)"}),`Up most (${bigUp.length})`),mvTable(bigUp,"Nothing rose 5% or more.")),
+      el("div",{class:"panel"},el("h3",null,el("span",{class:"dot",style:"background:var(--down-bar)"}),`Down most (${bigDn.length})`),mvTable(bigDn,"Nothing fell 5% or more.")))));
+
+  if(AU){
+    const rowsA=ps.filter(a=>!["Trading halt","Suspension","Reinstatement"].includes(a.kind)).map(a=>({a,r:byCode.get(a.code)})).filter(x=>x.r)
+      .sort((x,y)=>Math.abs(y.r.chg||0)-Math.abs(x.r.chg||0));
+    const t=el("table"),hr=el("tr"); ["Time","Company","Type","Announcement","Price reaction"].forEach((h,i)=>hr.append(el("th",{class:i===4?"num":"",text:h}))); t.append(el("thead",null,hr));
+    const tb=el("tbody"); rowsA.slice(0,S.annAll?200:12).forEach(({a,r})=>tb.append(el("tr",null,el("td",{class:"mut",text:a.t}),el("td",{class:"nm"},codeBtn(r.code),el("small",{text:r.name})),el("td",null,annTag(a.kind)),
+      el("td",{class:"why",text:a.head}),el("td",{class:"num"},chgNode(r.traded?r.chg:null))))); t.append(tb);
+    const ma=el("button",{class:"linkbtn",text:S.annAll?"Show fewer":`Show all ${rowsA.length}`}); ma.onclick=()=>{ S.annAll=!S.annAll; renderBrief(); };
+    host.append(el("section",null,sectionHead("Announcements that moved prices","Price-sensitive ASX announcements today, biggest price reaction first",rowsA.length>12?ma:null),
+      el("div",{class:"panel"},rowsA.length?el("div",{class:"tblwrap"},t):el("div",{class:"empty",text:"No price-sensitive announcements were collected for this day."}))));
+    const ht=el("table"),hhr=el("tr"); ["Company","Status","Since","Expected to resume",`Last price (${CUR})`,"1 month before"].forEach((h,i)=>hhr.append(el("th",{class:i>=4?"num":"",text:h}))); ht.append(el("thead",null,hhr));
+    const htb=el("tbody"); halts.forEach(h=>{ const r=byCode.get(h.code), soon=h.resumeBy&&h.resumeBy<=nxs;
+      htb.append(el("tr",{class:soon?"hl":""},el("td",{class:"nm"},r?codeBtn(h.code):el("b",{text:h.code}),el("small",{text:r?r.name:""})),el("td",null,el("span",{class:"pill",text:h.kind==="halt"?"Trading halt":"Suspended"})),
+        el("td",{text:dayLabel(new Date(h.since+"T00:00:00"))+(h.time?`, ${h.time}`:"")}),el("td",{text:h.resumeBy?`By ${dayLabel(new Date(h.resumeBy+"T00:00:00"))} at the latest`:"No date given"}),
+        el("td",{class:"num",text:r?price(r.price):"—"}),el("td",{class:"num "+(r?cls(r.m1):""),text:r?pct(r.m1,0):"—"}))); }); ht.append(htb);
+    host.append(el("section",null,sectionHead("Trading halts and suspensions","A trading halt lasts at most two trading days. Highlighted rows are due back by the next session."),
+      el("div",{class:"panel"},halts.length?el("div",{class:"tblwrap"},ht):el("div",{class:"empty",text:"No trading halts or suspensions on record."}))));
+  }
+  const sp=el("div",{class:"panel sectorchart",id:"sectorchart"}); host.append(el("section",null,sectionHead("Sectors today","Median move of stocks in each sector. Click one to see its movers."),sp));
+  renderSectors(list);
+  host.append(el("p",{class:"note",text:"Moves, announcements and halts describe what happened; they aren't predictions or buy and sell signals."}));
+}
+
+// ---------- company page ----------
+function dial(name,v,desc){ const w=el("div",{class:"dial"}); const s=sv("svg",{width:72,height:72,viewBox:"0 0 72 72",role:"img","aria-label":`${name} score ${isNum(v)?Math.round(v):"not available"} out of 100`});
+  s.append(sv("circle",{cx:36,cy:36,r:30,fill:"none",stroke:"var(--line)","stroke-width":7}));
+  if(isNum(v)&&v>0){ const a=Math.min(99.9,v)/100*2*Math.PI, x=36+30*Math.sin(a), y=36-30*Math.cos(a);
+    s.append(sv("path",{d:`M36 6 A30 30 0 ${v>50?1:0} 1 ${x.toFixed(1)} ${y.toFixed(1)}`,fill:"none",stroke:"var(--brass)","stroke-width":7,"stroke-linecap":"round"})); }
+  const t=sv("text",{x:36,y:42,"text-anchor":"middle","font-size":20,fill:"var(--text)",style:"font-family:var(--display)"}); t.textContent=isNum(v)?Math.round(v):"—"; s.append(t);
+  w.append(s,el("div",null,el("div",{class:"dn",text:name}),el("div",{class:"note",text:desc}))); return w; }
+function rangeView(label,valTxt,p,lo,hi,note){ const k=el("div",{class:"knob"}); k.style.left=Math.max(0,Math.min(100,p))+"%";
+  return el("div",{class:"rview"},el("div",{class:"rv-h"},el("b",{text:label}),el("span",{text:valTxt})),el("div",{class:"rbar"},k),el("div",{class:"rangelab"},el("span",{text:lo}),el("span",{text:hi})),note?el("div",{class:"note",text:note}):null); }
+function peersOf(r){ const vc=scoreAll(), pool=vc.items.filter(it=>it.r!==r&&it.r.group===r.group);
+  const p2=pool.length>=3?pool:vc.items.filter(it=>it.r!==r&&it.r.sector===r.sector);
+  return p2.sort((a,b)=>Math.abs(Math.log((a.r.mcap||1)/(r.mcap||1)))-Math.abs(Math.log((b.r.mcap||1)/(r.mcap||1)))).slice(0,4); }
+function renderCompany(code){
+  const r=byCode.get(code), host=$("view-company"); host.replaceChildren(); if(!r) return;
+  const f=M.fund[code], mm=fm(r), vc=scoreAll(), it=vc.items.find(x=>x.r===r), b=buffettAll().map.get(code)||(mm?buffett(r):null), later=[];
+  if(it) it.score=composite(it);
+  const back=el("a",{href:"#",class:"crumb",text:"‹ Back"}); back.onclick=e=>{ e.preventDefault(); history.length>1?history.back():go("brief"); };
+  host.append(el("div",{class:"crumbs"},back,el("span",{class:"mut",text:`${M.name} / ${r.sector} / ${r.group}`})));
+  const a=M.id==="AU"?mainAnn(code):null;
+  host.append(el("header",{class:"chead"},
+    el("div",null,el("div",{class:"kicker",text:`${M.exchange.split(" ")[0]}: ${r.code}, ${r.cap.toLowerCase()} cap`}),el("h1",{text:r.name}),
+      el("div",{class:"pxrow"},el("span",{class:"px",text:CUR+price(r.price)}),chgNode(r.traded?r.chg:null),
+        el("span",{class:"note",text:[r.traded?"today":"did not trade today",isNum(r.offhi)?`${pct(Math.abs(r.offhi),0).replace("+","")} below its 52-week high`:"",isNum(r.relvol)&&r.relvol>=1.5?`${num(r.relvol,1)}× usual volume`:""].filter(Boolean).join(", ")}))),
+    el("div",{class:"cactions"},starBtn(code,true),el("button",{class:"iconbtn big",type:"button",text:"Add to portfolio",onclick:()=>{ go("portfolio"); setTimeout(()=>{ const i=$("pf-code"); if(i){ i.value=code; $("pf-qty").focus(); } },50); }}))));
+  if(a) host.append(el("div",{class:"annbar"},annTag(a.kind),el("span",null,el("b",{text:`Today ${a.t}: `}),a.head),el("a",{href:`https://www.asx.com.au/markets/trade-our-cash-market/announcements.${code.toLowerCase()}`,target:"_blank",rel:"noopener",text:"Read on ASX ↗"})));
+  const halt=(M.halts||[]).find(h=>h.code===code); if(halt) host.append(el("div",{class:"annbar warnbar"},el("span",{class:"pill",text:halt.kind==="halt"?"Trading halt":"Suspended"}),el("span",{text:`Since ${dayLabel(new Date(halt.since+"T00:00:00"))}. `+(halt.resumeBy?`Due back by ${dayLabel(new Date(halt.resumeBy+"T00:00:00"))} at the latest.`:"No date given to resume.")})));
+  // dials
+  if(it){ const pc=p=>isNum(it.ps[p])?Math.round(it.ps[p]):null, rel=it.pk==="__all"?"the market":"its sector";
+    host.append(el("section",{class:"panel dials"},
+      dial("Value",pc("v"),isNum(pc("v"))?`Cheaper than ${pc("v")}% of ${rel}`:"Not enough data"),dial("Growth",pc("g"),isNum(pc("g"))?`Faster than ${pc("g")}% of ${rel}`:"Not enough data"),
+      dial("Quality",pc("q"),isNum(pc("q"))?`More profitable than ${pc("q")}% of ${rel}`:"Not enough data"),dial("Balance sheet",pc("b"),isNum(pc("b"))?`Stronger than ${pc("b")}% of ${rel}`:"Not enough data"),
+      el("div",{class:"dial-side"},b&&b.evaluated>=4?el("span",{class:"pill gold",text:`Buffett-style: ${b.passed} of ${b.evaluated} checks`}):null,
+        it.fl.red.length?el("span",{class:"pill redp",text:`${it.fl.red.length} red flag${it.fl.red.length>1?"s":""}`}):el("span",{class:"pill greenp",text:"No red flags"}),
+        isNum(it.score)?el("span",{class:"note",text:`Discover score ${Math.round(it.score)} with your current weights`}):null))); }
+  const grid=el("div",{class:"cgrid"}), L=el("div",{class:"ccol"}), R=el("div",{class:"ccol"}); grid.append(L,R); host.append(grid);
+  // price chart
+  const pts=parseHist(code), seg=el("div",{class:"seg"}), chartHost=el("div"); const ranges=[["1M",22],["3M",64],["6M",127],["1Y",9999]]; let cur="1Y";
+  const draw=()=>{ const n=ranges.find(x=>x[0]===cur)[1]; lineChart(chartHost,pts.slice(-n-1),Math.max(280,chartHost.clientWidth)); };
+  ranges.forEach(([lab])=>{ const bt=el("button",{"aria-pressed":String(lab===cur),text:lab}); bt.onclick=()=>{ cur=lab; [...seg.children].forEach(c=>c.setAttribute("aria-pressed",String(c.textContent===cur))); draw(); }; seg.append(bt); });
+  L.append(el("section",{class:"panel"},el("div",{class:"sechead"},el("h2",{text:"Price"}),seg),chartHost,
+    el("div",{class:"stats"},stat("5 days",pct(r.d5),cls(r.d5)),stat("1 month",pct(r.m1),cls(r.m1)),stat("3 months",pct(r.m3),cls(r.m3)),stat("Year to date",pct(r.ytd),cls(r.ytd)))));
+  later.push(draw);
+  // strengths and risks
+  if(it||b){ const S1=[],R1=[];
+    if(b) BUFFETT.forEach(c=>{ if(b.res[c.id]===true&&b.val[c.id]&&c.id!=="price") S1.push(b.val[c.id]); });
+    if(it) it.fl.green.forEach(x=>S1.push(x));
+    if(it) it.fl.red.forEach(x=>R1.push(x));
+    if(b) BUFFETT.forEach(c=>{ if(b.res[c.id]===false&&b.val[c.id]&&!R1.some(x=>x.toLowerCase().includes(c.name.toLowerCase()))) R1.push(`${c.name} check not met: ${b.val[c.id]}`); });
+    const dd=a=>[...new Set(a)].slice(0,6), li=(t,c,m)=>el("li",null,el("span",{class:c,text:m}),el("span",{text:t}));
+    L.append(el("div",{class:"two"},el("section",{class:"panel"},el("h2",{text:"Strengths"}),el("ul",{class:"srl"},...(dd(S1).length?dd(S1).map(t=>li(t,"up","+")):[el("li",{class:"note",text:"Nothing stands out."})]))),
+      el("section",{class:"panel"},el("h2",{text:"Risks"}),el("ul",{class:"srl"},...(dd(R1).length?dd(R1).map(t=>li(t,"down","!")):[el("li",{class:"note",text:"No red flags in the numbers."})]))))); }
+  // valuation views
+  const vs=el("section",{class:"panel"},el("h2",{text:"Is the price reasonable?"}),el("p",{class:"note",text:"Three separate views. The left end of each bar is cheaper."}));
+  if(it&&isNum(it.ps.v)){ const med=vc.med[it.pk]||{}; vs.append(rangeView(`Compared with ${it.pk==="__all"?"the market":"its sector"}`,mm&&isNum(mm.pe)?`P/E ${num(mm.pe,1)} vs ${isNum(med.pe)?num(med.pe,1):"—"}`:"",100-it.ps.v,"Cheapest","Most expensive",`Cheaper than ${Math.round(it.ps.v)}% of ${it.pk==="__all"?"the market":it.pk+" stocks"} on P/E, EV/EBITDA, price to book, cash flow and sales.`)); }
+  if(b&&isNum(b.mos)){ const ratio=1/(1+b.mos); vs.append(rangeView("Compared with estimated value",`Price is ${mosText(b.mos)}`,(Math.min(1.6,Math.max(0.4,ratio))-0.4)/1.2*100,"Price well below estimate","Price well above estimate",`Estimate: 10 years of average free cash flow growing ${pc0(Math.max(0,Math.min(0.10,isNum(mm.revCagr)?mm.revCagr:0)))} a year, then 3%, discounted at 10%, plus net cash. A rough guide, very sensitive to its assumptions.`)); }
+  if(isNum(r.hi52)&&isNum(r.lo52)&&r.hi52>r.lo52) vs.append(rangeView("Within its 52-week range",`${CUR}${price(r.price)}`,(r.price-r.lo52)/(r.hi52-r.lo52)*100,`Low ${CUR}${price(r.lo52)}`,`High ${CUR}${price(r.hi52)}`,null));
+  L.append(vs);
+  // detailed scorecards
+  if(mm){ const det=el("details",{class:"panel"}); det.append(el("summary",{class:"subh",text:"Detailed scores, F-score and flags"})); scorecard(det,r); L.append(det); }
+  // right column: key figures
+  if(f){ const debt=mm&&isNum(mm.debt)?mm.debt:null, cash=mm&&isNum(mm.cash)?mm.cash:null;
+    const kf=[["P/E",mm&&mm.loss?"Loss":(mm&&isNum(mm.pe)?num(mm.pe,1):"—")],["Forward P/E",mm&&isNum(mm.fpe)?num(mm.fpe,1):"—"],["EV / EBITDA",mm&&isNum(mm.evEbitda)?num(mm.evEbitda,1):"—"],["Price to book",mm&&isNum(mm.pb)?num(mm.pb,2):"—"],
+      ["Free cash flow yield",mm&&isNum(mm.fcfY)?pc1(mm.fcfY):"—"],["Dividend yield",mm&&isNum(mm.divY)?pc1(mm.divY):"—"],["Market cap",money(r.mcap)],["Revenue, 12 months",money(mm?mm.rev:f.totalRevenue)],
+      ["Net debt",isNum(debt)&&isNum(cash)?(debt-cash<0?"Net cash "+money(cash-debt):money(debt-cash)):"—"],["Debt to equity",mm&&isNum(mm.de)?num(mm.de,0)+"%":"—"],
+      ["Return on equity",isNum(f.returnOnEquity)?pc1(f.returnOnEquity):"—"],["Operating margin",isNum(f.operatingMargins)?pc1(f.operatingMargins):"—"]];
+    const ex=fromEpoch(f.exDividendDate), er=fromEpoch(f.earningsTimestampStart), today=new Date(M.marketDate+"T00:00:00");
+    if(ex&&ex>=today) kf.push(["Next ex-dividend",dayLabel(ex)]); if(er&&er>=today) kf.push(["Next results",dayLabel(er)]);
+    R.append(el("section",{class:"panel"},el("h2",{text:"Key figures"}),el("div",{class:"kfig"},...kf.map(([k,v])=>el("div",null,el("div",{class:"k",text:k}),el("div",{class:"v",text:v}))))));
+    const fxNote=isNum(f.fx)&&f.fx!==1&&f.fin_ccy?` (${f.fin_ccy})`:"";
+    const fh=el("section",{class:"panel"},el("h2",{text:"Financial health"+fxNote}));
+    [["Revenue",f.rev_y],["Net income",f.ni_y],["Free cash flow",f.fcf_y],["Total debt",f.debt_y]].forEach(([t,s])=>{ const h=el("div"); fh.append(el("h3",{text:t}),h); later.push(()=>h.replaceChildren(barChart(s,Math.max(220,h.clientWidth),t))); });
+    R.append(fh);
+    if(b&&b.evaluated>=4){ const ul=el("ul",{class:"checklist",style:"grid-template-columns:1fr"});
+      BUFFETT.forEach(c=>{ const v=b.res[c.id]; ul.append(el("li",{title:b.val[c.id]||"not enough data"},el("span",{class:v===true?"ok":v===false?"no":"na",text:v===true?"✓":v===false?"✗":"–"}),el("span",null,el("b",{text:c.name}),el("small",{class:"mut",style:"display:block",text:b.val[c.id]||"not enough data"})))); });
+      R.append(el("section",{class:"panel"},el("h2",{text:`Buffett-style checks: ${b.passed} of ${b.evaluated}`}),ul));
+      const B=M.berkshire, hb=B&&B.rows.find(x=>x.ticker===code&&x.change!=="sold");
+      if(hb) R.append(el("p",{class:"note",text:`Berkshire Hathaway held ${hb.shares.toLocaleString("en-AU")} shares (${pc1(hb.weight/100)} of its US portfolio) on ${fmtDate(B.period,{day:"numeric",month:"short",year:"numeric"})}.`})); }
+    if(f.summary) R.append(el("section",{class:"panel"},el("h2",{text:"About"}),el("p",{class:"summary",text:f.summary})));
+  } else R.append(el("section",{class:"panel"},el("h2",{text:"Fundamentals"}),el("p",{class:"empty",text:"Financials haven't been collected for this company yet. Smaller and thinly traded stocks are outside the collection; add the code to watchlist.txt to include it."})));
+  // peers
+  if(it){ const ps=peersOf(r); if(ps.length){ const t=el("table"),hr=el("tr"); ["Company","P/E","EV / EBITDA","Return on equity","Net debt / EBITDA","Buffett checks","Today"].forEach((h,i)=>hr.append(el("th",{class:i?"num":"",text:h}))); t.append(el("thead",null,hr));
+    const tb=el("tbody"); [it,...ps].forEach(x=>{ const bb=buffettAll().map.get(x.r.code); tb.append(el("tr",{class:x===it?"hl":""},el("td",{class:"nm"},x===it?el("b",{text:x.r.code}):codeBtn(x.r.code),el("small",{text:x.r.name})),
+      el("td",{class:"num",text:x.m.loss?"Loss":isNum(x.m.pe)?num(x.m.pe,1):"—"}),el("td",{class:"num",text:isNum(x.m.evEbitda)?num(x.m.evEbitda,1):"—"}),el("td",{class:"num",text:isNum(x.m.roe)?pc1(x.m.roe):"—"}),
+      el("td",{class:"num",text:isNum(x.m.ndEbitda)?(x.m.ndEbitda<0?"Net cash":num(x.m.ndEbitda,1)+"×"):"—"}),el("td",{class:"num",text:bb?`${bb.passed} of ${bb.evaluated}`:"—"}),el("td",{class:"num"},chgNode(x.r.traded?x.r.chg:null)))); });
+    t.append(tb); host.append(el("section",{class:"panel"},el("h2",{text:"Against its peers"}),el("p",{class:"note",text:`Closest in size within ${ps[0].r.group===r.group?r.group:r.sector}.`}),el("div",{class:"tblwrap"},t))); } }
+  host.append(links(r,f));
+  host.append(el("p",{class:"note",text:"Figures from Yahoo Finance"+(f?`, fetched ${f.fetched}`:"")+(M.id==="AU"?"; announcements and halts from the ASX":"")+". They describe the numbers; they aren't buy or sell advice."}));
+  requestAnimationFrame(()=>later.forEach(fn=>fn()));
+}
+
+// ---------- watchlist ----------
+function renderWatch(){ const host=$("view-watch"); host.replaceChildren(); const codes=(WATCH[M.id]||[]).filter(c=>byCode.get(c));
+  $("lede").textContent=codes.length?`${codes.length} ${M.name} stock${codes.length>1?"s":""} you follow. Saved in this browser on this device.`:"Star a stock on its company page to follow it here. Your watchlist is saved in this browser on this device.";
+  if(!codes.length){ host.append(el("div",{class:"panel empty",text:"Your watchlist is empty. Use the search box (Ctrl K), open a company and click Add to watchlist."})); return; }
+  const vc=scoreAll(), byIt=new Map(vc.items.map(x=>[x.r.code,x])), bc=buffettAll().map;
+  const t=el("table"),hr=el("tr"); ["","Company","Today",`Price (${CUR})`,"5 days","1 month","Value · Growth · Quality · Balance","Buffett","Flags",M.id==="AU"?"Latest news":"Sector"].forEach((h,i)=>hr.append(el("th",{class:[2,3,4,5,7].includes(i)?"num":"",text:h}))); t.append(el("thead",null,hr));
+  const tb=el("tbody"); codes.map(c=>byCode.get(c)).sort((a,b)=>Math.abs(b.chg||0)-Math.abs(a.chg||0)).forEach(r=>{ const x=byIt.get(r.code), b=bc.get(r.code), a=M.id==="AU"?mainAnn(r.code):null;
+    tb.append(el("tr",null,el("td",null,starBtn(r.code)),el("td",{class:"nm"},codeBtn(r.code),el("small",{text:r.name})),el("td",{class:"num"},chgNode(r.traded?r.chg:null)),el("td",{class:"num",text:price(r.price)}),
+      el("td",{class:"num "+cls(r.d5),text:pct(r.d5,1)}),el("td",{class:"num "+cls(r.m1),text:pct(r.m1,1)}),
+      el("td",null,...(x?["v","g","q","b"].map(p=>scChip(x.ps[p])):[el("span",{class:"mut",text:"No financials yet"})])),
+      el("td",{class:"num",text:b?`${b.passed} of ${b.evaluated}`:"—"}),el("td",null,x&&x.fl.red.length?el("span",{class:"flagtxt down",text:`${x.fl.red.length} red`,title:x.fl.red.join("\n")}):el("span",{class:"mut",text:x?"None":"—"})),
+      el("td",{class:"why"},a?annTag(a.kind):null,a?el("small",{text:a.head}):el("span",{class:"mut",text:M.id==="AU"?"No announcement today":r.sector})))); });
+  t.append(tb); host.append(el("div",{class:"panel"},el("div",{class:"tblwrap"},t))); }
+
+// ---------- portfolio ----------
+const moneyFull=v=>isNum(v)?(v<0?"−":"")+CUR+Math.round(Math.abs(v)).toLocaleString("en-AU"):"—";
+function renderPortfolio(){ const host=$("view-portfolio"); host.replaceChildren(); const mine=PORT.map((h,i)=>({...h,i})).filter(h=>h.m===M.id);
+  const save=()=>{ store.set("sd-portfolio",PORT); renderNavCounts(); renderPortfolio(); };
+  $("lede").textContent=`Your ${M.name} holdings, valued at the latest close. Saved in this browser on this device; nothing is uploaded.`;
+  // add form
+  const dl=el("datalist",{id:"pf-codes"}); rows.slice().sort((a,b)=>(b.mcap||0)-(a.mcap||0)).slice(0,3000).forEach(r=>dl.append(el("option",{value:r.code,label:r.name})));
+  const fc=el("input",{id:"pf-code",type:"text",list:"pf-codes",placeholder:"Code, e.g. "+(rows[0]?rows[0].code:""),autocomplete:"off"}), fq=el("input",{id:"pf-qty",type:"number",min:"0",step:"any",placeholder:"Shares"}), fp=el("input",{id:"pf-cost",type:"number",min:"0",step:"any",placeholder:`Average cost (${CUR})`});
+  const msg=el("span",{class:"note"});
+  const add=el("button",{class:"iconbtn big pri",type:"button",text:"Add holding"});
+  add.onclick=()=>{ const code=fc.value.trim().toUpperCase(), q=+fq.value, c=+fp.value; if(!byCode.get(code)){ msg.textContent=`${code||"That code"} isn't in the ${M.name} list.`; return; }
+    if(!(q>0)){ msg.textContent="Enter how many shares you hold."; return; } const ex=PORT.find(h=>h.m===M.id&&h.code===code);
+    if(ex){ const tq=ex.qty+q; ex.cost=(isNum(ex.cost)&&c>0)?(ex.cost*ex.qty+c*q)/tq:(c>0?c:ex.cost); ex.qty=tq; } else PORT.push({m:M.id,code,qty:q,cost:c>0?c:null}); save(); };
+  const imp=el("details",{class:"imp"}), ta=el("textarea",{rows:4,placeholder:"One holding per line: CODE, shares, average cost\nKSM, 1200, 6.10"}), ib=el("button",{class:"iconbtn",type:"button",text:"Import"});
+  ib.onclick=()=>{ let n=0; ta.value.split(/\n/).forEach(l=>{ const [c,q,p]=l.split(/[,\t;]/).map(s=>s.trim()); const code=(c||"").toUpperCase().replace(/\.AX$/,""); if(byCode.get(code)&&+q>0){ PORT=PORT.filter(h=>!(h.m===M.id&&h.code===code)); PORT.push({m:M.id,code,qty:+q,cost:+p>0?+p:null}); n++; } }); msg.textContent=`Imported ${n} holding${n===1?"":"s"}.`; save(); };
+  imp.append(el("summary",{text:"Import several at once"}),ta,ib);
+  host.append(el("section",{class:"panel pform"},el("h2",{text:"Add a holding"}),el("div",{class:"pfrow"},el("label",null,"Code",fc),el("label",null,"Shares",fq),el("label",null,"Average cost",fp),add),msg,imp,dl));
+  if(!mine.length){ host.append(el("div",{class:"panel empty",text:`No ${M.name} holdings yet. Add one above to see its value, scores and anything that needs attention.`})); return; }
+  const vc=scoreAll(), byIt=new Map(vc.items.map(x=>[x.r.code,x])), bc=buffettAll().map;
+  let tv=0,tc=0,td=0,costKnown=0; const enriched=mine.map(h=>{ const r=byCode.get(h.code); const v=r&&isNum(r.price)?h.qty*r.price:0; tv+=v; if(isNum(h.cost)){ tc+=h.qty*h.cost; costKnown+=v; }
+    if(r&&r.traded&&isNum(r.prev)) td+=h.qty*(r.price-r.prev); return {...h,r,v}; });
+  const strip=el("div",{class:"strip"});
+  strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Value"}),el("div",{class:"v",text:moneyFull(tv)}),el("div",{class:"s",text:`${mine.length} holding${mine.length>1?"s":""}`})));
+  strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Today"}),el("div",{class:"v "+cls(td),text:(td>=0?"+":"−")+moneyFull(Math.abs(td)).replace("−","")}),el("div",{class:"s "+cls(td),text:pct(tv-td?td/(tv-td)*100:0,2)})));
+  if(tc) strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Gain on cost"}),el("div",{class:"v "+cls(costKnown-tc),text:(costKnown-tc>=0?"+":"−")+moneyFull(Math.abs(costKnown-tc))}),el("div",{class:"s "+cls(costKnown-tc),text:pct((costKnown/tc-1)*100,1)})));
+  const wb=enriched.reduce((a,h)=>{ const b=bc.get(h.code); if(b&&h.v){ a.s+=b.passed/b.evaluated*8*h.v; a.w+=h.v; } return a; },{s:0,w:0});
+  if(wb.w) strip.append(el("div",{class:"tile"},el("div",{class:"k",text:"Average Buffett-style checks"}),el("div",{class:"v",text:`${num(wb.s/wb.w,1)} of 8`}),el("div",{class:"s",text:"weighted by value"})));
+  host.append(strip);
+  // needs attention
+  const att=[]; const secW={}; enriched.forEach(h=>{ if(h.r) secW[h.r.sector]=(secW[h.r.sector]||0)+h.v; });
+  enriched.forEach(h=>{ const x=byIt.get(h.code), w=tv?h.v/tv:0, a=M.id==="AU"?mainAnn(h.code):null;
+    if(x&&x.fl.red.length) att.push([`${h.code}: ${x.fl.red[0]}${x.fl.red.length>1?` (and ${x.fl.red.length-1} more)`:""}. It's ${pc0(w)} of your portfolio.`,h.code]);
+    if(h.r&&h.r.traded&&Math.abs(h.r.chg)>=5) att.push([`${h.code} ${h.r.chg>0?"rose":"fell"} ${pct(Math.abs(h.r.chg),1).replace("+","")} today${a?` after an announcement: ${a.head}`:", with no company announcement"}.`,h.code]);
+    else if(a&&a.ps) att.push([`${h.code} released a price-sensitive announcement: ${a.head}.`,h.code]);
+    if((M.halts||[]).some(z=>z.code===h.code)) att.push([`${h.code} is in a trading halt or suspension.`,h.code]);
+    if(w>0.25&&mine.length>2) att.push([`${h.code} is ${pc0(w)} of your portfolio.`,h.code]); });
+  Object.entries(secW).forEach(([s,v])=>{ if(tv&&v/tv>0.4&&Object.keys(secW).length>1) att.push([`${s} is ${pc0(v/tv)} of your portfolio.`,null]); });
+  if(att.length){ const ul=el("ul",{class:"attl"}); att.slice(0,8).forEach(([t,c])=>{ const li=el("li",null,t); if(c){ const b=el("button",{class:"linkbtn",text:"Open",onclick:()=>openCompany(c)}); li.append(" ",b); } ul.append(li); });
+    host.append(el("section",{class:"panel attn"},el("h2",{text:"Needs attention"}),ul)); }
+  // holdings table
+  const t=el("table"),hr=el("tr"); ["Company","Shares","Avg. cost","Price","Value","Today","Gain","Value · Growth · Quality · Balance","Buffett","Red flags",""].forEach((h,i)=>hr.append(el("th",{class:[1,2,3,4,5,6,8].includes(i)?"num":"",text:h}))); t.append(el("thead",null,hr));
+  const tb=el("tbody"); enriched.sort((a,b)=>b.v-a.v).forEach(h=>{ const r=h.r, x=byIt.get(h.code), b=bc.get(h.code), g=isNum(h.cost)&&r?(r.price/h.cost-1)*100:null;
+    const rm=el("button",{class:"linkbtn",text:"Remove",onclick:()=>{ PORT.splice(h.i,1); save(); }});
+    tb.append(el("tr",null,el("td",{class:"nm"},codeBtn(h.code),el("small",{text:r?r.name:""})),el("td",{class:"num",text:h.qty.toLocaleString("en-AU")}),el("td",{class:"num",text:isNum(h.cost)?price(h.cost):"—"}),
+      el("td",{class:"num",text:r?price(r.price):"—"}),el("td",{class:"num",text:moneyFull(h.v)}),el("td",{class:"num"},chgNode(r&&r.traded?r.chg:null)),el("td",{class:"num "+cls(g),text:isNum(g)?pct(g,1):"—"}),
+      el("td",null,...(x?["v","g","q","b"].map(p=>scChip(x.ps[p])):[el("span",{class:"mut",text:"—"})])),el("td",{class:"num",text:b?`${b.passed} of ${b.evaluated}`:"—"}),
+      el("td",{class:"why"},x&&x.fl.red.length?el("span",{class:"down",style:"font-weight:700;font-size:12.5px",text:x.fl.red.join("; ")}):el("span",{class:"mut",text:x?"None":"—"})),el("td",null,rm))); });
+  t.append(tb); host.append(el("section",{class:"panel"},el("h2",{text:"Holdings"}),el("div",{class:"tblwrap"},t)));
+  // allocation
+  const pal=["#D6AE62","#5B8DEF","#3DBFA8","#B08CF0","#E58C5A","#9FB3D1","#E87BA4","#7FB069"];
+  const al=Object.entries(secW).sort((a,b)=>b[1]-a[1]); const bar=el("div",{class:"abar"}), leg=el("div",{class:"aleg"});
+  al.forEach(([s,v],i)=>{ const c=pal[i%pal.length]; const sp=el("span",{title:`${s}: ${pc0(v/tv)}`}); sp.style.flex=String(v); sp.style.background=c; bar.append(sp);
+    leg.append(el("span",null,el("i",{style:`background:${c}`}),`${s} ${pc0(v/tv)}`)); });
+  host.append(el("section",{class:"panel"},el("h2",{text:"Where your money is"}),bar,leg));
+}
+
+// ---------- Berkshire page ----------
+function renderBerkshirePage(){ const host=$("view-berkshire");
+  if(!M.berkshire){ host.replaceChildren(el("div",{class:"panel empty"},M.id==="US"?"Berkshire Hathaway's holdings haven't been collected yet. They arrive with the next US update.":"Berkshire Hathaway's filings list US-listed shares. ",
+    M.id!=="US"&&D.markets.some(m=>m.id==="US")?el("button",{class:"linkbtn",text:"Switch to United States",onclick:()=>{ location.hash="#/US/berkshire"; }}):null)); $("lede").textContent=""; return; }
+  $("lede").textContent="What Warren Buffett's company reported owning at the end of the last quarter, and what changed.";
+  if(!host.contains($("sec-berkshire"))) return; $("sec-berkshire").hidden=false; renderBerkshire(); }
+
 // ---------- render ----------
 function render(){
   buildSidebar(); const list=filtered();
-  $("views").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===S.view)));
-  $("view-moves").hidden=S.view!=="moves"; $("view-value").hidden=S.view!=="value"; $("view-buffett").hidden=S.view!=="buffett";
+  ["brief","moves","value","buffett","watch","portfolio","berkshire","company"].forEach(v=>{ const e=$("view-"+v); if(e) e.hidden=S.view!==v; });
+  $("hero").hidden=S.view==="company";
+  $("pagetag").textContent=S.view==="company"?"":VIEWS[S.view]+" · "+M.name;
+  $("filters").classList.toggle("dim",["company","watch","portfolio","berkshire"].includes(S.view));
+  if(S.view==="company"){ renderCompany(S.company); return; }
   renderHero(list);
+  if(S.view==="brief"){ renderBrief(); return; }
   if(S.view==="value"){ renderValueControls(); renderValueResults(); renderMethod(); return; }
   if(S.view==="buffett"){ renderBuffett(); return; }
+  if(S.view==="watch"){ renderWatch(); return; }
+  if(S.view==="portfolio"){ renderPortfolio(); return; }
+  if(S.view==="berkshire"){ renderBerkshirePage(); return; }
   renderHeat(list);
   $("topG").replaceChildren(moverTable(topN(list,10,1),{showCap:true}));
   $("topL").replaceChildren(moverTable(topN(list,10,-1),{showCap:true}));
-  renderSectors(list); renderBySector(list); renderByCap(list); render52(list); renderAll(list); }
+  renderSectors(list); renderBySector(list); renderByCap(list); render52(list); renderAll(list);
+  if(S.pendingSec){ S.pendingSec=false; requestAnimationFrame(()=>$("sec-bysector").scrollIntoView({block:"start"})); } }
 
 let st; $("search").addEventListener("input",e=>{ clearTimeout(st); st=setTimeout(()=>{ S.search=e.target.value; S.page=0; render(); },180); });
 $("minturn").onchange=e=>{ S.minTurn=+e.target.value; S.page=0; render(); };
@@ -1217,14 +1636,11 @@ $("bysec").onchange=e=>{ S.bySec=e.target.value; S.byGrp=""; renderBySector(filt
 $("bygrp").onchange=e=>{ S.byGrp=e.target.value; renderBySector(filtered()); };
 [["secmetric","secMetric",()=>renderSectors(filtered())],["mapsize","mapSize",()=>renderHeat(filtered())]].forEach(([id,key,fn])=>
   $(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{ S[key]=b.dataset.v; $(id).querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",String(x===b))); fn(); }));
-$("dlg").addEventListener("click",e=>{ if(e.target===$("dlg")) $("dlg").close(); });
-$("dlg").addEventListener("close",hideTip);
 const root=document.documentElement;
 function setTheme(t){ if(t==="light") root.dataset.theme="light"; else delete root.dataset.theme; $("theme").textContent= t==="light"?"Dark":"Light"; try{ localStorage.setItem("mm-theme",t); }catch(e){} }
 let saved="dark"; try{ saved=localStorage.getItem("mm-theme")||"dark"; }catch(e){}
 setTheme(saved); $("theme").onclick=()=>setTheme(root.dataset.theme==="light"?"dark":"light");
-let rt; addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(S.view==="value") renderValueResults(); else renderHeat(filtered()); },150); });
-$("views").querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(S.view===b.dataset.v) return; S.view=b.dataset.v; S.page=0; render(); scrollTo({top:0}); });
+let rt; addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(S.view==="value") renderValueResults(); else if(S.view==="moves") renderHeat(filtered()); },150); });
 $("vclear").onclick=()=>{ S.vf.f={}; markCustom(); S.vf.page=0; renderValueControls(); renderValueResults(); };
 
 
@@ -1285,7 +1701,7 @@ $("syncbtn").addEventListener("click",e=>{ e.stopPropagation(); const p=$("syncp
 document.addEventListener("click",e=>{ if(!$("syncpop").hidden&&!e.target.closest(".syncwrap")){ $("syncpop").hidden=true; $("syncbtn").setAttribute("aria-expanded","false"); } });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("syncpop").hidden){ $("syncpop").hidden=true; $("syncbtn").setAttribute("aria-expanded","false"); $("syncbtn").focus(); } });
 renderSync();
-loadMarket(D.markets.some(m=>m.id==="AU")?"AU":D.markets[0].id); S=DEFAULT(); render();
+loadMarket(D.markets.some(m=>m.id==="AU")?"AU":D.markets[0].id); S=DEFAULT(); quickSearch(); applyHash();
 })();
 </script>
 </body>
