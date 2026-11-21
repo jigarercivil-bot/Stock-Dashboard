@@ -16,6 +16,12 @@ GitHub Pages.
   current ratio, Piotroski F-score), ranked against its own sector. Strategy presets,
   adjustable weights and filters, a "cheap versus strong" chart, red flags, and a scorecard
   for every company.
+- **Buffett-style** – eight checks drawn from Warren Buffett's shareholder letters and
+  Berkshire's acquisition criteria (consistent profit, high return on equity, little debt,
+  durable margins, real cash earnings, growth, no dilution, sensible price against an
+  estimated value), for both markets. The US view also shows what Berkshire Hathaway owns,
+  from its latest quarterly 13F filing with the SEC, with changes since the previous quarter.
+  Inspired by his published principles; not stocks he has picked.
 - **Company view** – 1-year price chart, 52-week range, key figures, and revenue, profit,
   cash flow, debt and cash by year.
 
@@ -49,6 +55,12 @@ python asx_dashboard.py --mock          # made-up data, for layout testing only
 At the top of `asx_dashboard.py`: market-cap bands, Value finder universe (size and
 turnover floors), fundamentals per run, and refresh age. `watchlist.txt` lists codes that
 always get fundamentals (`PLS.AX` for ASX only, `US:SOFI` for US only).
+
+## SEC contact for Berkshire's holdings
+
+The SEC requires every automated request to name a contact. Add a repository **secret**
+named `SEC_CONTACT` with your name and email (for example `Jane Smith jane@example.com`).
+On your PC, set an environment variable of the same name.
 
 ## Data and caveats
 

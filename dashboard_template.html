@@ -246,6 +246,21 @@ input[type=range]{width:100%;accent-color:var(--brass)}
 .bigscore b{font:500 44px/1 var(--display);color:var(--brass)}
 #scatter{position:relative}
 @media (max-width:1100px){ .vfgrid{grid-template-columns:1fr} }
+/* ---------- Buffett tab ---------- */
+.bfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:12px}
+.bfcheck{position:relative;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:12px 14px 12px 46px;cursor:pointer;min-height:96px}
+.bfcheck:hover{border-color:var(--line-2)}
+.bfcheck .n{position:absolute;left:12px;top:12px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--display);background:var(--panel-2);color:var(--brass);border:1px solid var(--line-2)}
+.bfcheck b{display:block;font-size:14px;margin-bottom:2px}
+.bfcheck .d{display:block;font-size:12px;color:var(--text-2);line-height:1.35}
+.bfcheck .c{display:block;font-size:12px;color:var(--muted);margin-top:6px;font-weight:600}
+.bfcheck[aria-pressed=true]{border-color:var(--brass);background:var(--brass-soft)}
+.bfcheck[aria-pressed=true] .n{background:var(--brass);color:var(--brass-ink);border-color:var(--brass)}
+.dots{display:inline-flex;gap:3px}
+.dots i{width:10px;height:10px;border-radius:3px;display:block}
+.dots i.y{background:var(--up-bar)} .dots i.n{background:var(--down-bar);opacity:.85} .dots i.u{background:var(--line-2)}
+.pill-up{background:var(--up-soft);color:var(--up);border-color:transparent} .pill-down{background:var(--down-soft);color:var(--down);border-color:transparent}
+.disclaim{font-size:12.5px;color:var(--text-2);border-left:3px solid var(--brass);padding:6px 12px;margin:0 0 16px;max-width:90ch}
 @media (max-width:1100px){ .two{grid-template-columns:1fr} }
 @media (min-width:1101px) and (max-width:1560px){ .two .opt.t{display:none} }
 @media (max-width:600px){ .opt{display:none} .nm{min-width:120px} }
@@ -303,7 +318,7 @@ input[type=range]{width:100%;accent-color:var(--brass)}
 
   <main>
     <div class="topline">
-      <nav class="views" id="views" aria-label="View"><button data-v="moves">Today's moves</button><button data-v="value">Value finder</button></nav>
+      <nav class="views" id="views" aria-label="View"><button data-v="moves">Today's moves</button><button data-v="value">Value finder</button><button data-v="buffett">Buffett-style</button></nav>
       <div class="syncwrap">
         <button class="synccount" id="synccount" aria-controls="syncpop"></button>
         <button class="syncbtn" id="syncbtn" aria-expanded="false" aria-controls="syncpop"><span class="sdot"></span><span id="synctext"></span></button>
@@ -415,6 +430,24 @@ input[type=range]{width:100%;accent-color:var(--brass)}
       </section>
       <section><details class="panel method"><summary>How the scores work</summary><div id="method"></div></details></section>
     </div>
+    <div id="view-buffett" hidden>
+      <p class="disclaim">Built from the investing principles Warren Buffett has described in his letters to Berkshire Hathaway shareholders. It is not a list of stocks he owns or recommends, and it isn't financial advice.</p>
+      <section>
+        <div class="sechead"><div><h2>The eight checks</h2><p>Click a check to make it a must-pass</p></div>
+          <div class="controls"><span class="note">Show stocks passing</span><div class="seg" id="bfmin"></div></div></div>
+        <div class="bfgrid" id="bfchecks"></div>
+      </section>
+      <section>
+        <div class="sechead"><div><h2>Shortlist</h2><p id="bfnote"></p></div></div>
+        <div class="panel"><div class="tblwrap" id="bftable"></div><div class="pager" id="bfpager"></div></div>
+      </section>
+      <section id="sec-berkshire" hidden>
+        <div class="sechead"><div><h2>What Berkshire Hathaway owns</h2><p id="brknote"></p></div>
+          <button class="linkbtn" id="brksold"></button></div>
+        <div class="strip" id="brktiles"></div>
+        <div class="panel"><div class="tblwrap" id="brktable"></div></div>
+      </section>
+    </div>
   </main>
 </div>
 
@@ -478,11 +511,11 @@ const TURN_STEPS={ "A$":[0,20e3,50e3,100e3,500e3,1e6,5e6], "US$":[0,100e3,500e3,
 const TURN_DEFAULT={ "A$":100e3, "US$":1e6 };
 const DEFAULT=()=>({ search:"", minTurn:TURN_DEFAULT[CUR]??0, minPrice:0,
   caps:new Set(CAP_ORDER.filter(c=>c!=="Mega")), sectors:new Set(SECTORS),
-  secMetric:S?S.secMetric:"median", mapSize:S?S.mapSize:"mcap", view:S?S.view:"moves", vf:S?S.vf:defaultVF(), capTab:null, bySec:null, byGrp:"", sortKey:"chg", sortDir:-1, page:0 });
+  secMetric:S?S.secMetric:"median", mapSize:S?S.mapSize:"mcap", view:S?S.view:"moves", vf:S?S.vf:defaultVF(), bf:S?S.bf:defaultBF(), capTab:null, bySec:null, byGrp:"", sortKey:"chg", sortDir:-1, page:0 });
 let S=null;
 
 function filtered(){ const q=S.search.trim().toLowerCase();
-  return rows.filter(r=> S.caps.has(r.cap) && S.sectors.has(r.sector) && ((S.view==="value"?r.avgturn:r.turnover)||0)>=S.minTurn && (r.price||0)>=S.minPrice &&
+  return rows.filter(r=> S.caps.has(r.cap) && S.sectors.has(r.sector) && ((S.view!=="moves"?r.avgturn:r.turnover)||0)>=S.minTurn && (r.price||0)>=S.minPrice &&
     (!q || r.code.toLowerCase().includes(q) || (r.name||"").toLowerCase().includes(q))); }
 const movers=list=>list.filter(r=>r.traded&&isNum(r.chg));
 function topN(list,n,dir){ return movers(list).sort((a,b)=>dir>0?b.chg-a.chg:a.chg-b.chg).slice(0,n).filter(r=>dir>0?r.chg>0:r.chg<0); }
@@ -508,7 +541,7 @@ function buildSidebar(){
   if(!(TURN_STEPS[CUR]||[]).includes(S.minTurn)) mt.append(el("option",{value:S.minTurn,text:short(S.minTurn)}));
   mt.value=String(S.minTurn);
   $("minpricelab").textContent=`Minimum price (${CUR})`;
-  document.querySelector('label[for="minturn"]').textContent = S.view==="value"? "Average daily turnover, at least" : "Traded today, at least";
+  document.querySelector('label[for="minturn"]').textContent = S.view!=="moves"? "Average daily turnover, at least" : "Traded today, at least";
   const sec=$("sectors"); sec.replaceChildren(); const sc={}; rows.forEach(r=>sc[r.sector]=(sc[r.sector]||0)+1);
   SECTORS.forEach(s=>{ const cb=el("input",{type:"checkbox"}); cb.checked=S.sectors.has(s);
     cb.onchange=()=>{ cb.checked?S.sectors.add(s):S.sectors.delete(s); S.page=0; render(); };
@@ -525,6 +558,7 @@ function spark(vals,color){ const w=200,h=30; const v=vals.filter(isNum); const 
   return s; }
 function renderHero(list){
   if(S.view==="value"){ $("kicker").textContent=`${M.name}, fundamentals`; $("headline").textContent="Value finder"; return; }
+  if(S.view==="buffett"){ $("kicker").textContent=`${M.name}, quality at a sensible price`; $("headline").textContent="Buffett-style screen"; return; }
   $("kicker").textContent = `${M.name}, close of trade`;
   $("headline").textContent = fmtDate(M.marketDate);
   const m=movers(list), adv=m.filter(r=>r.chg>0).length, dec=m.filter(r=>r.chg<0).length;
@@ -738,7 +772,7 @@ function openCompany(code){
     stat("Year to date",pct(r.ytd),cls(r.ytd)), stat("Volume",isNum(r.vol)?r.vol.toLocaleString("en-AU"):"—"), stat("Previous close",CUR+price(r.prev))));
   if(!f){ body.append(el("div",{class:"subh",text:"Fundamentals"}), el("div",{class:"empty",text:"Not fetched yet for this stock. Each run adds fundamentals for the day's movers and a rolling batch of the market; add the code to watchlist.txt to always include it."})); }
   else {
-    const mm=fm(r); if(mm) scorecard(body,r);
+    const mm=fm(r); if(mm){ scorecard(body,r); buffettCard(body,r); }
     body.append(el("div",{class:"subh",text:"Key figures"}));
     const g=(k,alt)=>mm&&isNum(mm[k])?mm[k]:alt;
     const debt=g("debt",isNum(f.totalDebt)?f.totalDebt:lastV(f.debt_y)), cash=g("cash",isNum(f.totalCash)?f.totalCash:lastV(f.cash_y));
@@ -801,7 +835,7 @@ const VF_BOOL=[["profit","Profitable only"],["fcfPos","Positive free cash flow"]
 const defaultVF=()=>({preset:"balanced",w:{...PRESETS[0].w},f:{},rel:"sector",page:0,sortKey:"score",sortDir:-1});
 
 function fm(r){
-  const f=M.fund[r.code]; if(!f||f.v!==2||!isNum(r.price)) return null;
+  const f=M.fund[r.code]; if(!f||!(f.v>=2)||!isNum(r.price)) return null;
   const k=isNum(f.fx)?f.fx:null, P=r.price, X=v=>isNum(v)&&k!=null?v*k:null;
   const cap=isNum(r.mcap)&&r.mcap>0?r.mcap:(isNum(f.sharesOutstanding)?f.sharesOutstanding*P:null);
   const eps=isNum(f.eps_t)?f.eps_t:X(f.trailingEps), feps=isNum(f.feps_t)?f.feps_t:X(f.forwardEps), bvps=isNum(f.bvps_t)?f.bvps_t:X(f.bookValue);
@@ -1013,14 +1047,161 @@ function scorecard(body,r){
   if(isNum(it.m.upside)&&it.m.f.numberOfAnalystOpinions) ex.push(`Analysts' average target ${pct(it.m.upside*100,0)} from today (${it.m.f.numberOfAnalystOpinions} analysts)`);
   if(ex.length) body.append(el("p",{class:"note",style:"margin-top:10px",text:ex.join(". ")+"."}));
 }
+// ---------- Buffett-style screen ----------
+// price vs estimated value: "x% below value" = 1 - price/value; "x% above value" = price/value - 1
+function mosText(mos){ if(!isNum(mos)) return "—"; const ratio=1/(1+mos); return ratio<=1?`${pc0(1-ratio)} below value`:`${pc0(ratio-1)} above value`; }
+const BUFFETT=[
+  {id:"profit",name:"Consistent profit",desc:"Profitable in every one of the last 4–5 years"},
+  {id:"roe",name:"High return on equity",desc:"Averages 15% or more, never below 8%"},
+  {id:"debt",name:"Little debt",desc:"Net cash, or debt repayable from 3 years of profit"},
+  {id:"moat",name:"Durable advantage",desc:"Gross margin 40%+, operating margin 15%+, holding steady"},
+  {id:"cash",name:"Real cash earnings",desc:"Free cash flow positive every year and at least 70% of profit"},
+  {id:"growth",name:"Growing business",desc:"Revenue and shareholders' equity higher than 4–5 years ago"},
+  {id:"shares",name:"No dilution",desc:"Share count steady or falling"},
+  {id:"price",name:"Sensible price",desc:"Free cash flow yield 5%+ and price at or below estimated value"},
+];
+const defaultBF=()=>({min:7,req:[],page:0,sortKey:"rank",sortDir:1,showSold:false});
+const ser=(f,k)=>(f[k]||[]).filter(p=>isNum(p.v)).sort((a,b)=>a.p<b.p?-1:1);
+const byP=a=>{ const o={}; a.forEach(p=>o[p.p]=p.v); return o; };
+const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const pc0=x=>pct(x*100,0).replace("+",""), pc1=x=>pct(x*100,1).replace("+","");
+function buffett(r){
+  const m=fm(r); if(!m) return null; const f=m.f, k=isNum(f.fx)?f.fx:null;
+  const ni=ser(f,"ni_y"), eq=ser(f,"equity_y"), fcf=ser(f,"fcf_y"), rev=ser(f,"rev_y"), gp=ser(f,"gp_y"), oi=ser(f,"oi_y"), sh=ser(f,"shares_y");
+  const res={}, val={};
+  if(ni.length>=3){ const n=ni.filter(p=>p.v>0).length; res.profit=n===ni.length; val.profit=`Profitable in ${n} of the last ${ni.length} years`; }
+  else if(m.loss!=null){ res.profit=!m.loss; val.profit=m.loss?"Loss-making over the last 12 months":"Profitable over the last 12 months (no longer history)"; }
+  const eqm=byP(eq), roes=ni.filter(p=>eqm[p.p]>0).map(p=>p.v/eqm[p.p]);
+  if(roes.length>=3){ const a=avg(roes), lo=Math.min(...roes); res.roe=a>=0.15&&lo>=0.08; val.roe=`Average ${pc1(a)} over ${roes.length} years, lowest ${pc1(lo)}`; }
+  else if(isNum(m.roe)){ res.roe=m.roe>=0.15; val.roe=`${pc1(m.roe)} in the latest year (no longer history)`; }
+  const lastNi=ni.length?ni[ni.length-1].v:null;
+  const debtF=isNum(f.totalDebt)?f.totalDebt:lastV(f.debt_y), cashF=isNum(f.totalCash)?f.totalCash:lastV(f.cash_y);
+  if(isNum(debtF)&&isNum(cashF)&&cashF>=debtF){ res.debt=true; val.debt="Net cash: more cash than debt"; }
+  else if(isNum(debtF)&&isNum(lastNi)){ if(lastNi<=0){ res.debt=false; val.debt="Loss-making, so debt can't be repaid from profit"; }
+    else { const y=debtF/lastNi; res.debt=y<=3; val.debt=`Debt equals ${num(y,1)} years of profit`; } }
+  const revm=byP(rev), gms=gp.filter(p=>revm[p.p]>0).map(p=>p.v/revm[p.p]), oms=oi.filter(p=>revm[p.p]>0).map(p=>p.v/revm[p.p]);
+  const gmA=gms.length>=3?avg(gms):(isNum(f.grossMargins)?f.grossMargins:null), omA=oms.length>=3?avg(oms):(isNum(f.operatingMargins)?f.operatingMargins:null);
+  const steady=oms.length>=3?oms[oms.length-1]>=0.8*avg(oms):true;
+  if(isNum(omA)){ const gmOk=isNum(gmA)&&gmA>0?gmA>=0.40:true; res.moat=gmOk&&omA>=0.15&&steady;
+    val.moat=`Gross margin ${isNum(gmA)&&gmA>0?pc0(gmA):"not reported"}, operating margin ${pc0(omA)}`+(steady?"":", but falling recently"); }
+  if(fcf.length>=3){ const pos=fcf.filter(p=>p.v>0).length, nim=byP(ni), both=fcf.filter(p=>isNum(nim[p.p]));
+    const sF=both.reduce((a,p)=>a+p.v,0), sN=both.reduce((a,p)=>a+nim[p.p],0), conv=sN>0?sF/sN:null;
+    res.cash=pos===fcf.length&&(conv==null||conv>=0.7);
+    val.cash=`Positive in ${pos} of ${fcf.length} years`+(conv!=null?`, ${Math.round(conv*100)}% of profit`:""); }
+  if(rev.length>=3&&eq.length>=3&&rev[0].v>0&&eq[0].v>0){ const rg=rev[rev.length-1].v/rev[0].v-1, eg=eq[eq.length-1].v/eq[0].v-1;
+    res.growth=rg>0&&eg>0; val.growth=`Revenue ${pct(rg*100,0)} and equity ${pct(eg*100,0)} over ${rev.length-1} years`; }
+  if(sh.length>=2&&sh[0].v>0){ const c=sh[sh.length-1].v/sh[0].v-1; res.shares=c<=0.02;
+    val.shares=c<=-0.005?`Share count down ${pc1(-c)} (buybacks)`:c<=0.02?"Share count steady":`Share count up ${pc1(c)} (dilution)`; }
+  else { const t=(f.fs||[]).find(x=>/new shares/i.test(x[0])); if(t&&t[1]!=null){ res.shares=t[1]===1; val.shares=t[1]===1?"No new shares issued last year":"New shares issued last year"; } }
+  // estimated value: 10 years of owner earnings (average free cash flow of the last 3 years) growing at
+  // the multi-year revenue growth rate (0–10%), then 3% a year, discounted at 10%; plus net cash.
+  let iv=null, mos=null; const oeF=fcf.length?avg(fcf.slice(-3).map(p=>p.v)):(isNum(f.freeCashflow)?f.freeCashflow:null);
+  if(isNum(oeF)&&k!=null&&isNum(m.cap)&&m.cap>0){ const oe=oeF*k;
+    if(oe>0){ const g=Math.max(0,Math.min(0.10,isNum(m.revCagr)?m.revCagr:0)); let pv=0, c=oe;
+      for(let t=1;t<=10;t++){ c*=1+g; pv+=c/Math.pow(1.10,t); }
+      pv+=c*1.03/(0.10-0.03)/Math.pow(1.10,10);
+      const netCash=(isNum(m.cash)?m.cash:0)-(isNum(m.debt)?m.debt:0); iv=pv+netCash; mos=iv/m.cap-1;
+      res.price=isNum(m.fcfY)&&m.fcfY>=0.05&&mos>=0;
+      val.price=`Free cash flow yield ${isNum(m.fcfY)?pc1(m.fcfY):"—"}; estimated value ${money(iv)} vs market cap ${money(m.cap)}`; }
+    else { res.price=false; val.price="No positive free cash flow to value the business on"; } }
+  const ids=BUFFETT.map(b=>b.id), evaluated=ids.filter(i=>res[i]!=null).length, passed=ids.filter(i=>res[i]===true).length;
+  return {r,m,res,val,passed,evaluated,iv,mos,roeAvg:roes.length>=3?avg(roes):m.roe,debtYrs:isNum(debtF)&&isNum(lastNi)&&lastNi>0?(isNum(cashF)&&cashF>=debtF?0:debtF/lastNi):null,omA};
+}
+let BC=null;
+function buffettAll(){ if(BC&&BC.key===M.id) return BC; const map=new Map(); rows.forEach(r=>{ const b=buffett(r); if(b&&b.evaluated>=6) map.set(r.code,b); }); BC={key:M.id,map}; return BC; }
+
+function renderBuffett(){
+  const list=filtered(), inView=new Set(list.map(r=>r.code)), all=[...buffettAll().map.values()].filter(b=>inView.has(b.r.code));
+  const counts={}; BUFFETT.forEach(c=>counts[c.id]=all.filter(b=>b.res[c.id]===true).length);
+  const req=new Set(S.bf.req);
+  const pass=all.filter(b=>b.passed>=Math.min(S.bf.min,b.evaluated)&&b.passed>=S.bf.min-(8-b.evaluated)&&[...req].every(id=>b.res[id]===true))
+    .sort((a,b)=>b.passed-a.passed||(isNum(b.mos)?b.mos:-9)-(isNum(a.mos)?a.mos:-9)); pass.forEach((b,i)=>b.rank=i+1);
+  const lede=$("lede"); lede.replaceChildren(`Checks ${all.length.toLocaleString()} stocks in your view against eight rules drawn from Warren Buffett's letters to Berkshire shareholders and Berkshire's published acquisition criteria. `,
+    el("strong",{text:`${all.filter(b=>b.passed===8).length.toLocaleString()} pass all eight; ${pass.length.toLocaleString()} match your settings.`}),
+    " Inspired by his published principles; these are not stocks he has picked.");
+  $("countline").textContent=`Prices as at ${fmtDate(M.marketDate,{day:"numeric",month:"short",year:"numeric"})}\nBased on up to 5 years of reported figures`;
+  const g=$("bfchecks"); g.replaceChildren();
+  BUFFETT.forEach((c,i)=>{ const on=req.has(c.id); const b=el("button",{class:"bfcheck","aria-pressed":String(on),title:on?"Click to stop requiring this check":"Click to require this check"},
+      el("span",{class:"n",text:String(i+1)}), el("b",{text:c.name}), el("span",{class:"d",text:c.desc}), el("span",{class:"c",text:`${counts[c.id].toLocaleString()} of ${all.length.toLocaleString()} pass`+(on?" · required":"")}));
+    b.onclick=()=>{ const s=new Set(S.bf.req); s.has(c.id)?s.delete(c.id):s.add(c.id); S.bf.req=[...s]; S.bf.page=0; renderBuffett(); }; g.append(b); });
+  const seg=$("bfmin"); seg.replaceChildren(); [8,7,6,5].forEach(n=>{ const b=el("button",{"aria-pressed":String(S.bf.min===n),text:n===8?"All 8":`${n}+`});
+    b.onclick=()=>{ S.bf.min=n; S.bf.page=0; renderBuffett(); }; seg.append(b); });
+  renderBfTable(pass);
+  const bh=$("sec-berkshire"); bh.hidden=!M.berkshire; if(M.berkshire) renderBerkshire();
+}
+function checkDots(b){ const w=el("span",{class:"dots"}); BUFFETT.forEach(c=>{ const v=b.res[c.id]; w.append(el("i",{class:v===true?"y":v===false?"n":"u",title:`${c.name}: ${v===true?"pass":v===false?"fail":"not enough data"}`})); }); return w; }
+const BFCOLS=[["rank","#","num"],["code","Code"],["name","Company"],["checks","Checks"],["passed","Passed","num"],["roeAvg","Avg ROE","num"],["debtYrs","Debt, years of profit","num"],["omA","Op. margin","num"],["fcfY","FCF yield","num"],["mos","Value vs price","num"],["mcap","Market cap","num"]];
+function bfv(b,k){ if(k==="code"||k==="name"||k==="mcap") return b.r[k]; if(k==="fcfY") return b.m.fcfY; if(k==="checks") return b.passed; return b[k]; }
+function renderBfTable(pass){
+  const k=S.bf.sortKey,d=S.bf.sortDir, L=k==="rank"?pass:[...pass].sort((a,b)=>{ const x=bfv(a,k),y=bfv(b,k); if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (typeof x==="string"?x.localeCompare(y):x-y)*d; });
+  $("bfnote").textContent=pass.length?"Ranked by checks passed, then by how far the price is below the estimated value. Hover the dots for each check; open a company for the details.":"";
+  if(!L.length){ $("bftable").replaceChildren(el("div",{class:"empty",text:"No stocks match. Lower the minimum checks, require fewer checks, or widen the sidebar filters."})); $("bfpager").replaceChildren(); return; }
+  const per=25,pages=Math.max(1,Math.ceil(L.length/per)); S.bf.page=Math.min(S.bf.page,pages-1);
+  const t=el("table"),hr=el("tr");
+  BFCOLS.forEach(([key,lab,c])=>{ const th=el("th",{class:"sortable "+(c||""),tabindex:"0",text:lab+(key===k?(d>0?" ↑":" ↓"):"")+(key==="mcap"?` (${CUR})`:"")});
+    const go=()=>{ if(S.bf.sortKey===key) S.bf.sortDir*=-1; else { S.bf.sortKey=key; S.bf.sortDir=["rank","code","name","debtYrs"].includes(key)?1:-1; } renderBfTable(pass); };
+    th.onclick=go; th.onkeydown=e=>{ if(e.key==="Enter") go(); }; hr.append(th); });
+  t.append(el("thead",null,hr)); const tb=el("tbody");
+  L.slice(S.bf.page*per,(S.bf.page+1)*per).forEach(b=>{ const r=b.r;
+    const dots=el("td",null,checkDots(b)); dots.onmousemove=e=>showTip(e,BUFFETT.map(c=>`${b.res[c.id]===true?"✓":b.res[c.id]===false?"✗":"–"} ${c.name}: ${b.val[c.id]||"not enough data"}`).join("\n")); dots.onmouseleave=hideTip;
+    tb.append(el("tr",null, el("td",{class:"num",text:b.rank}), el("td",null,codeBtn(r.code)), el("td",{class:"nm",title:r.name},r.name,el("small",{text:`${r.sector}, ${r.cap.toLowerCase()} cap`})),
+      dots, el("td",{class:"num"},el("b",{text:`${b.passed} of ${b.evaluated}`})),
+      el("td",{class:"num",text:isNum(b.roeAvg)?pc1(b.roeAvg):"—"}), el("td",{class:"num",text:b.debtYrs===0?"Net cash":isNum(b.debtYrs)?num(b.debtYrs,1):"—"}),
+      el("td",{class:"num",text:isNum(b.omA)?pc0(b.omA):"—"}), el("td",{class:"num "+cls(b.m.fcfY),text:isNum(b.m.fcfY)?pc1(b.m.fcfY):"—"}),
+      el("td",{class:"num "+(isNum(b.mos)?(b.mos>=0?"up":"down"):""),text:mosText(b.mos)}),
+      el("td",{class:"num",text:bare(r.mcap)}))); });
+  t.append(tb); $("bftable").replaceChildren(t);
+  const p=$("bfpager"); p.replaceChildren(); const prev=el("button",{class:"iconbtn",text:"Previous"}), next=el("button",{class:"iconbtn",text:"Next"});
+  prev.disabled=S.bf.page===0; next.disabled=S.bf.page>=pages-1; prev.onclick=()=>{S.bf.page--;renderBfTable(pass);}; next.onclick=()=>{S.bf.page++;renderBfTable(pass);};
+  p.append(`${L.length.toLocaleString()} stocks, page ${S.bf.page+1} of ${pages}`,prev,next); }
+
+function renderBerkshire(){
+  const B=M.berkshire, bc=buffettAll().map;
+  $("brknote").textContent=`What Berkshire Hathaway reported owning on ${fmtDate(B.period,{day:"numeric",month:"long",year:"numeric"})}, filed with the SEC on ${fmtDate(B.filed,{day:"numeric",month:"long",year:"numeric"})}. US-listed shares only; filings come about 45 days after each quarter ends.`;
+  const held=B.rows.filter(x=>x.change!=="sold").sort((a,b)=>(b.weight||0)-(a.weight||0)), cnt=c=>B.rows.filter(x=>x.change===c).length;
+  let today=0, todayKnown=0; held.forEach(x=>{ const r=x.ticker&&byCode.get(x.ticker); if(r&&isNum(r.price)){ today+=x.shares*r.price; todayKnown+=x.value; } });
+  const tiles=$("brktiles"); tiles.replaceChildren(
+    el("div",{class:"tile"},el("div",{class:"k",text:"Reported value"}),el("div",{class:"v",text:money(B.total)}),el("div",{class:"s",text:`${held.length} holdings`})),
+    el("div",{class:"tile"},el("div",{class:"k",text:"Same shares at today's prices"}),el("div",{class:"v",text:todayKnown?money(today+(B.total-todayKnown)):"—"}),el("div",{class:"s",text:todayKnown?`${pct((today/todayKnown-1)*100,1)} since the filing date`:""})),
+    el("div",{class:"tile"},el("div",{class:"k",text:"This quarter"}),el("div",{class:"v",style:"font-size:20px"},el("span",{class:"up",text:`${cnt("new")} new`}),", ",el("span",{class:"up",text:`${cnt("added")} added`})),el("div",{class:"s"},el("span",{class:"down",text:`${cnt("reduced")} reduced, ${cnt("sold")} sold`}))),
+    el("div",{class:"tile"},el("div",{class:"k",text:"Top 5 holdings"}),el("div",{class:"v",text:pc0(held.slice(0,5).reduce((a,x)=>a+(x.weight||0),0)/100)}),el("div",{class:"s",text:"of the portfolio"})));
+  const t=el("table"),hr=el("tr");
+  ["Code","Company","Share of portfolio","Shares","Change this quarter","Value at filing (US$)","Today","Buffett checks"].forEach((h,i)=>hr.append(el("th",{class:[2,3,5,6,7].includes(i)?"num":"",text:h})));
+  t.append(el("thead",null,hr)); const tb=el("tbody"); const maxW=Math.max(...held.map(x=>x.weight||0),1);
+  (S.bf.showSold?held.concat(B.rows.filter(x=>x.change==="sold")):held).forEach(x=>{ const r=x.ticker&&byCode.get(x.ticker), b=r&&bc.get(r.code);
+    const chg=x.change, chgTxt=chg==="new"?"New position":chg==="sold"?"Sold out":chg==="added"?`Added ${pc0(x.shares/x.prevShares-1)}`:chg==="reduced"?`Cut ${pc0(1-x.shares/x.prevShares)}`:"No change";
+    const wcell=el("td",{class:"num"},el("div",{class:"scorecell",style:"justify-content:flex-end"},el("b",{text:x.weight?pc1(x.weight/100):"—"}),el("div",{class:"scorebar",style:"max-width:90px"},el("i",{style:`width:${(x.weight||0)/maxW*100}%`}))));
+    tb.append(el("tr",null, el("td",null,r?codeBtn(r.code):el("span",{class:"note",text:x.ticker||"—"})),
+      el("td",{class:"nm",title:x.name},x.name,el("small",{text:r?r.sector:x.cls})), wcell,
+      el("td",{class:"num",text:x.shares?x.shares.toLocaleString("en-AU"):"—"}),
+      el("td",{class:"num"},el("span",{class:"pill "+(chg==="new"||chg==="added"?"pill-up":chg==="sold"||chg==="reduced"?"pill-down":""),text:chgTxt})),
+      el("td",{class:"num",text:x.value?bare(x.value):"—"}), el("td",{class:"num"},r&&r.traded?chgNode(r.chg):el("span",{class:"note",text:"—"})),
+      el("td",{class:"num",text:b?`${b.passed} of ${b.evaluated}`:"—"}))); });
+  t.append(tb); $("brktable").replaceChildren(t);
+  const sb=$("brksold"); sb.textContent=S.bf.showSold?"Hide sold positions":`Show ${cnt("sold")} sold position${cnt("sold")===1?"":"s"}`; sb.hidden=!cnt("sold");
+  sb.onclick=()=>{ S.bf.showSold=!S.bf.showSold; renderBerkshire(); };
+}
+
+function buffettCard(body,r){
+  const b=buffettAll().map.get(r.code)||buffett(r); if(!b||b.evaluated<4) return;
+  body.append(el("div",{class:"subh",text:`Buffett-style checks: ${b.passed} of ${b.evaluated} passed`}));
+  const ul=el("ul",{class:"checklist",style:"grid-template-columns:1fr"});
+  BUFFETT.forEach(c=>{ const v=b.res[c.id]; ul.append(el("li",null,el("span",{class:v===true?"ok":v===false?"no":"na",text:v===true?"✓":v===false?"✗":"–"}),
+    el("span",null,el("b",{text:c.name+": "}),b.val[c.id]||"not enough data"))); });
+  body.append(el("div",{class:"panel"},ul));
+  if(isNum(b.mos)) body.append(el("p",{class:"note",style:"margin-top:8px",text:`Estimated value assumes 10 years of free cash flow (average of the last 3 years) growing ${pc0(Math.max(0,Math.min(0.10,isNum(b.m.revCagr)?b.m.revCagr:0)))} a year, then 3%, discounted at 10%, plus net cash. On that basis the share price is ${mosText(b.mos)}. It's a rough guide, very sensitive to its assumptions.`}));
+  const B=M.berkshire, h=B&&B.rows.find(x=>x.ticker===r.code&&x.change!=="sold");
+  if(h) body.append(el("p",{class:"note",text:`Berkshire Hathaway held ${h.shares.toLocaleString("en-AU")} shares (${pc1(h.weight/100)} of its US portfolio) on ${fmtDate(B.period,{day:"numeric",month:"short",year:"numeric"})}.`}));
+}
 
 // ---------- render ----------
 function render(){
   buildSidebar(); const list=filtered();
   $("views").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===S.view)));
-  $("view-moves").hidden=S.view!=="moves"; $("view-value").hidden=S.view!=="value";
+  $("view-moves").hidden=S.view!=="moves"; $("view-value").hidden=S.view!=="value"; $("view-buffett").hidden=S.view!=="buffett";
   renderHero(list);
   if(S.view==="value"){ renderValueControls(); renderValueResults(); renderMethod(); return; }
+  if(S.view==="buffett"){ renderBuffett(); return; }
   renderHeat(list);
   $("topG").replaceChildren(moverTable(topN(list,10,1),{showCap:true}));
   $("topL").replaceChildren(moverTable(topN(list,10,-1),{showCap:true}));

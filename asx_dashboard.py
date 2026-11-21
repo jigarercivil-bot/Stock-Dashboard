@@ -28,6 +28,7 @@ import argparse
 import io
 import json
 import math
+import os
 import random
 import re
 import sys
@@ -51,7 +52,7 @@ WATCHLIST = HERE / "watchlist.txt"
 # ---------------------------------------------------------------- settings ---
 UNIVERSE_TTL_DAYS = 1          # re-download company lists daily
 FUND_TTL_DAYS = 14             # refresh a stock's fundamentals after this many days
-FUND_VERSION = 2               # bump to force a refetch of every cached fundamentals file
+FUND_VERSION = 3               # files from older versions are still used, and refreshed first
 FUND_THREADS = 4               # parallel Yahoo requests (keep low to avoid rate limits)
 FUND_TOP_N = 15                # fundamentals for top/bottom N per group
 CHUNK = 150                    # tickers per yfinance batch
@@ -452,8 +453,11 @@ def load_cached_fund(yahoo: str):
         d = json.loads(f.read_text())
     except Exception:  # noqa: BLE001
         return None, False
-    if d.get("v") != FUND_VERSION:
+    if d.get("v") not in (2, FUND_VERSION):
         return None, False
+    if d.get("v") != FUND_VERSION:
+        d["v"] = FUND_VERSION          # usable now; marked stale so it gets the new fields soon
+        return d, False
     return d, time.time() - f.stat().st_mtime < FUND_TTL_DAYS * 86400
 
 
@@ -502,6 +506,9 @@ def fetch_fundamentals(yahoo: str) -> dict:
         (bs, "cash_y", ["Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments"], 5),
         (bs, "equity_y", ["Stockholders Equity", "Common Stock Equity"], 5),
         (cf, "fcf_y", ["Free Cash Flow"], 5),
+        (inc, "gp_y", ["Gross Profit"], 5),
+        (inc, "oi_y", ["Operating Income", "Total Operating Income As Reported"], 5),
+        (bs, "shares_y", ["Ordinary Shares Number", "Share Issued"], 5),
     ]:
         try:
             out[key] = _stmt_series(df, keys, n)
@@ -666,6 +673,160 @@ def apply_fx(fund: dict, trade_ccy: str) -> None:
         d["fx"] = 1.0 if not c or c == trade_ccy else fnum(rates.get(c), 6)
 
 
+
+# ---------------------------------------------------------- Berkshire 13F ---
+BRK_CIK = "0001067983"
+# The SEC asks every automated request to name a contact ("Name email"). Set SEC_CONTACT
+# (a GitHub Actions variable, or an environment variable on your PC) to your own.
+SEC_UA = {"User-Agent": os.environ.get("SEC_CONTACT", "").strip() or "Stock-Dashboard research tool",
+          "Accept-Encoding": "gzip, deflate"}
+BRK_TTL_DAYS = 7
+
+
+def _sec_get(url: str):
+    import requests
+
+    r = requests.get(url, headers=SEC_UA, timeout=60)
+    r.raise_for_status()
+    time.sleep(0.25)                       # SEC asks for no more than 10 requests a second
+    return r
+
+
+def _parse_13f_table(xml_text: str) -> dict:
+    """Aggregate a 13F information table by CUSIP -> {name, cls, cusip, value, shares}."""
+    import xml.etree.ElementTree as ET
+
+    root = ET.fromstring(xml_text.encode("utf-8") if isinstance(xml_text, str) else xml_text)
+    out: dict = {}
+    for node in root.iter():
+        if not node.tag.endswith("infoTable"):
+            continue
+        get = {c.tag.split("}")[-1]: c for c in node}
+        def txt(k):
+            return (get[k].text or "").strip() if k in get and get[k] is not None else ""
+        cusip = txt("cusip").upper()
+        shares = 0.0
+        if "shrsOrPrnAmt" in get:
+            for c in get["shrsOrPrnAmt"]:
+                if c.tag.endswith("sshPrnamt"):
+                    shares = float(c.text or 0)
+        if txt("putCall"):
+            continue                       # skip options
+        val = float(txt("value") or 0)
+        e = out.setdefault(cusip, {"name": txt("nameOfIssuer"), "cls": txt("titleOfClass"),
+                                   "cusip": cusip, "value": 0.0, "shares": 0.0})
+        e["value"] += val
+        e["shares"] += shares
+    return out
+
+
+def _latest_13f_filings(n: int = 2) -> list[dict]:
+    sub = _sec_get(f"https://data.sec.gov/submissions/CIK{BRK_CIK}.json").json()
+    rec = sub["filings"]["recent"]
+    rows = []
+    for form, acc, filed, period in zip(rec["form"], rec["accessionNumber"], rec["filingDate"], rec["reportDate"]):
+        if form in ("13F-HR", "13F-HR/A"):
+            rows.append({"form": form, "acc": acc, "filed": filed, "period": period})
+    # keep one filing per quarter, the latest (an amendment can restate a quarter)
+    by_q = {}
+    for r in sorted(rows, key=lambda r: r["filed"]):
+        if r["form"] == "13F-HR" or r["period"] not in by_q:
+            by_q[r["period"]] = r
+    return [by_q[k] for k in sorted(by_q, reverse=True)[:n]]
+
+
+def _filing_table(acc: str) -> str:
+    cik = str(int(BRK_CIK))
+    base = f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc.replace('-', '')}"
+    idx = _sec_get(f"{base}/index.json").json()
+    names = [i["name"] for i in idx["directory"]["item"] if i["name"].lower().endswith(".xml")]
+    names = [n for n in names if "primary_doc" not in n.lower()] or names
+    for n in names:
+        txt = _sec_get(f"{base}/{n}").text
+        if "infoTable" in txt:
+            return txt
+    raise RuntimeError("no information table in filing " + acc)
+
+
+def _figi_tickers(cusips: list[str]) -> dict:
+    import requests
+
+    out = {}
+    for i in range(0, len(cusips), 10):
+        batch = cusips[i:i + 10]
+        try:
+            r = requests.post("https://api.openfigi.com/v3/mapping", timeout=60,
+                              json=[{"idType": "ID_CUSIP", "idValue": c, "exchCode": "US"} for c in batch])
+            if r.status_code == 429:
+                time.sleep(30)
+                r = requests.post("https://api.openfigi.com/v3/mapping", timeout=60,
+                                  json=[{"idType": "ID_CUSIP", "idValue": c, "exchCode": "US"} for c in batch])
+            r.raise_for_status()
+            for c, res in zip(batch, r.json()):
+                d = (res.get("data") or [{}])[0]
+                if d.get("ticker"):
+                    out[c] = d["ticker"].replace("/", ".").upper()
+        except Exception as e:  # noqa: BLE001
+            log(f"  OpenFIGI lookup failed: {e}")
+        time.sleep(2.6)                    # 25 requests a minute without a key
+    return out
+
+
+def _name_key(s: str) -> str:
+    s = re.sub(r"[^a-z0-9 ]", " ", str(s).lower())
+    stop = {"inc", "corp", "corporation", "co", "company", "ltd", "limited", "plc", "the", "class", "com",
+            "new", "hldgs", "holdings", "group", "del", "sa", "ag", "nv", "cl", "a", "b"}
+    return " ".join(w for w in s.split() if w not in stop)
+
+
+def berkshire_holdings(us_rows: pd.DataFrame | None) -> dict | None:
+    """Berkshire Hathaway's latest 13F holdings, with change against the previous quarter."""
+    CACHE.mkdir(exist_ok=True)
+    cf = CACHE / "berkshire.json"
+    if cf.exists() and time.time() - cf.stat().st_mtime < BRK_TTL_DAYS * 86400:
+        try:
+            return json.loads(cf.read_text())
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        filings = _latest_13f_filings(2)
+        if not filings:
+            raise RuntimeError("no 13F filings found")
+        cur = _parse_13f_table(_filing_table(filings[0]["acc"]))
+        prev = _parse_13f_table(_filing_table(filings[1]["acc"])) if len(filings) > 1 else {}
+        tick = _figi_tickers(sorted(set(cur) | set(prev)))
+        names = {}
+        if us_rows is not None and len(us_rows):
+            for code, nm in zip(us_rows["code"], us_rows["name"]):
+                names.setdefault(_name_key(nm), code)
+        rows = []
+        tot = sum(h["value"] for h in cur.values()) or 1
+        for cusip in sorted(set(cur) | set(prev), key=lambda c: -cur.get(c, {}).get("value", 0)):
+            h, p = cur.get(cusip), prev.get(cusip)
+            base = h or p
+            t = tick.get(cusip) or names.get(_name_key(base["name"]))
+            sh, psh = (h or {}).get("shares", 0.0), (p or {}).get("shares", 0.0)
+            change = "sold" if not h else "new" if not p else ("added" if sh > psh * 1.001 else "reduced" if sh < psh * 0.999 else "unchanged")
+            rows.append({"cusip": cusip, "ticker": t, "name": base["name"].title(), "cls": base["cls"],
+                         "shares": round(sh), "prevShares": round(psh), "value": round((h or {}).get("value", 0)),
+                         "weight": fnum((h or {}).get("value", 0) / tot * 100, 3), "change": change})
+        data = {"period": filings[0]["period"], "filed": filings[0]["filed"],
+                "prevPeriod": filings[1]["period"] if len(filings) > 1 else None,
+                "accession": filings[0]["acc"], "fetched": datetime.now().strftime("%Y-%m-%d"),
+                "total": round(tot), "rows": rows}
+        cf.write_text(json.dumps(data))
+        log(f"Berkshire 13F: {len([r for r in rows if r['change'] != 'sold'])} holdings for {data['period']}, filed {data['filed']}")
+        return data
+    except Exception as e:  # noqa: BLE001
+        log(f"Berkshire 13F fetch failed: {e}")
+        if cf.exists():
+            try:
+                return json.loads(cf.read_text())
+            except Exception:  # noqa: BLE001
+                return None
+        return None
+
+
 def index_moves(indices: dict) -> list[dict]:
     import yfinance as yf
 
@@ -724,7 +885,10 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
     src = ("Prices from Yahoo Finance (end of day, delayed). Company list and market cap from "
            + ("the ASX." if mkt == "AU" else "Nasdaq's stock screener (all NYSE, Nasdaq and NYSE American listings)."))
     stats = {"listed": len(uni), "priced": len(m), "traded": int(m["traded"].sum()), "fund": fstats}
-    return market_payload(mkt, m, hist, mdate, fund, idx, src, stats)
+    payload = market_payload(mkt, m, hist, mdate, fund, idx, src, stats)
+    if mkt == "US":
+        payload["berkshire"] = berkshire_holdings(m)
+    return payload
 
 
 def market_payload(mkt, m, hist, mdate, fund, idx, source, stats=None) -> dict:
@@ -829,6 +993,11 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
             "fcf_y": [{"p": f"{y}-06", "v": round(fcf * rng.uniform(0.6, 1.3))} for y in range(2021, 2026)],
             "fs": fs, "fscore": sum(x[1] for x in fs), "fmax": 9,
         }
+        gm_ = min(0.9, om + rng.uniform(0.1, 0.45))
+        fund[r["code"]]["gp_y"] = [{"p": p_["p"], "v": round(p_["v"] * gm_ * rng.uniform(0.95, 1.05))} for p_ in fund[r["code"]]["rev_y"]]
+        fund[r["code"]]["oi_y"] = [{"p": p_["p"], "v": round(p_["v"] * om * rng.uniform(0.9, 1.1))} for p_ in fund[r["code"]]["rev_y"]]
+        drift = rng.choice([-0.02, -0.01, 0, 0.01, 0.04])
+        fund[r["code"]]["shares_y"] = [{"p": f"{y}-06", "v": round(shares * (1 + drift) ** (y - 2025))} for y in range(2021, 2026)]
     base = {"AU": 8000, "US": 5800}[mkt]
     idx = []
     for k, (s, nm) in enumerate(cfg["indices"].items()):
@@ -839,7 +1008,24 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
     stats = {"listed": len(m) + 6, "priced": len(m), "traded": len(m),
              "fund": {"scope": int(len(m) * 0.9), "due": 300, "tried": 260, "fetched": 240, "failed": 20,
                       "stopped": "yahoo", "covered": len(fund)}}
-    return market_payload(mkt, m, hist, days[-1], fund, idx, "Synthetic test data — not real prices.", stats)
+    payload = market_payload(mkt, m, hist, days[-1], fund, idx, "Synthetic test data — not real prices.", stats)
+    if mkt == "US":
+        picks = m.sort_values("mcap", ascending=False).head(45)
+        w = [rng.uniform(0.2, 1) ** 3 for _ in range(len(picks))]
+        tot = sum(w)
+        rows = []
+        for (_, r), wi in zip(picks.iterrows(), w):
+            ch = rng.choice(["unchanged"] * 5 + ["added", "reduced", "new"])
+            val = 270e9 * wi / tot
+            sh = val / r["price"]
+            psh = 0 if ch == "new" else sh * (0.8 if ch == "added" else 1.25 if ch == "reduced" else 1)
+            rows.append({"cusip": "000000000", "ticker": r["code"], "name": r["name"], "cls": "COM", "shares": round(sh),
+                         "prevShares": round(psh), "value": round(val), "weight": fnum(wi / tot * 100, 3), "change": ch})
+        rows.append({"cusip": "999999999", "ticker": None, "name": "Example Sold Holding", "cls": "COM", "shares": 0,
+                     "prevShares": 1000000, "value": 0, "weight": 0, "change": "sold"})
+        payload["berkshire"] = {"period": "2026-09-30", "filed": "2026-11-14", "prevPeriod": "2026-06-30",
+                                "accession": "mock", "fetched": "mock", "total": 270e9, "rows": rows}
+    return payload
 
 
 # ------------------------------------------------------------------ output ---

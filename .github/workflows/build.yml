@@ -52,6 +52,7 @@ jobs:
 
       - name: Build Stock Dashboard
         env:
+          SEC_CONTACT: ${{ secrets.SEC_CONTACT }}
           MARKETS: ${{ github.event.schedule == '47 6 * * 1-5' && 'AU' || github.event.schedule == '17 22 * * 0-4' && 'US' || inputs.markets || 'AU,US' }}
           FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
         # Gentle mode: one company at a time, pauses between, backs off when Yahoo pushes back,
