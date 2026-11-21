@@ -31,7 +31,7 @@ in the filters.
 ## How it runs
 
 `.github/workflows/build.yml` runs twice each Sydney weekday (no weekend runs):
-the ASX at 5:47pm Sydney time, after its 4pm close, and the US at 9:17am Sydney time, after
+the ASX at 5pm Sydney time (all year, whatever the daylight-saving offset), after its 4pm close, and the US at 9:17am Sydney time, after
 New York's close (Monday morning's run picks up Friday's US close). Each run rebuilds its own
 market and keeps the other market's last build. Company
 financials are cached between runs (each run fetches up to 600 ASX and 800 US companies),

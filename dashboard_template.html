@@ -1229,10 +1229,17 @@ $("vclear").onclick=()=>{ S.vf.f={}; markCustom(); S.vf.page=0; renderValueContr
 
 
 // ---------- last sync ----------
-// must match the two cron lines in .github/workflows/build.yml (UTC, Mon–Fri)
-const SCHED_UTC={AU:{h:6,m:47,days:[1,2,3,4,5]},US:{h:22,m:17,days:[0,1,2,3,4]}};
-function schedAt(id,now,dir){ const sc=SCHED_UTC[id]; if(!sc) return null; const d=new Date(now); d.setUTCHours(sc.h,sc.m,0,0);
-  for(let i=0;i<9;i++){ if((dir<0?d<=now:d>now)&&sc.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()+(dir<0?-1:1)); } return null; }
+// must match .github/workflows/build.yml. ASX: 5pm Sydney time Mon–Fri (whatever the UTC offset);
+// US: 22:17 UTC Sun–Thu (9:17am Sydney Mon–Fri in summer, 8:17am in winter).
+const SCHED={AU:{syd:{h:17,m:0,days:[1,2,3,4,5]}},US:{utc:{h:22,m:17,days:[0,1,2,3,4]}}};
+const sydParts=d=>{ const p=new Intl.DateTimeFormat("en-AU",{timeZone:"Australia/Sydney",hour:"numeric",minute:"numeric",hourCycle:"h23",weekday:"short"}).formatToParts(d);
+  const g=t=>(p.find(x=>x.type===t)||{}).value; return {h:+g("hour"),m:+g("minute"),wd:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(g("weekday"))}; };
+function schedAt(id,now,dir){ const sc=SCHED[id]; if(!sc) return null; const step=dir<0?-1:1;
+  if(sc.utc){ const d=new Date(now); d.setUTCHours(sc.utc.h,sc.utc.m,0,0);
+    for(let i=0;i<9;i++){ if((dir<0?d<=now:d>now)&&sc.utc.days.includes(d.getUTCDay())) return d; d.setUTCDate(d.getUTCDate()+step); } return null; }
+  const base=new Date(now); base.setUTCMinutes(0,0,0);          // walk hour by hour until it's the Sydney time
+  for(let i=0;i<24*9;i++){ const d=new Date(base.getTime()+step*i*36e5), p=sydParts(d);
+    if(p.h===sc.syd.h&&sc.syd.days.includes(p.wd)&&(dir<0?d<=now:d>now)) return d; } return null; }
 function ago(ms){ const m=Math.round(ms/6e4); if(m<60) return m<=1?"just now":`${m} minutes ago`; const h=Math.round(m/60); if(h<48) return `${h} hour${h===1?"":"s"} ago`; return `${Math.round(h/24)} days ago`; }
 function builtAt(m){ return m.builtUtc?new Date(m.builtUtc):(D.generatedUtc?new Date(D.generatedUtc):null); }
 function isStale(m,now){ if(!D.scheduled) return false; const last=schedAt(m.id,now,-1), b=builtAt(m);
@@ -1270,7 +1277,7 @@ function renderSync(){
     else if(f.stopped==="time") pop.append(el("div",{class:"note",text:"Reached that run's time limit for financials. The rest come on the next runs."}));
     if(isStale(m,now)) pop.append(el("div",{class:"warn",text:`The ${short(schedAt(m.id,now,-1))} ${m.name} update hasn't arrived. Check the Actions tab on GitHub, or start a run there with "Run workflow".`})); });
   pop.append(el("div",{class:"note",style:"margin-top:10px",text: D.scheduled
-    ? "The ASX updates after its 4pm close and the US after New York's close (the next Sydney morning), Monday to Friday Sydney time. GitHub sometimes starts a run up to 30 minutes late. Times are in your local time zone."
+    ? "The ASX updates at 5pm Sydney time, after its 4pm close, and the US after New York's close (the next Sydney morning), Monday to Friday. GitHub sometimes starts a run up to 30 minutes late. Times are in your local time zone."
     : "Built on this computer. Run run_dashboard.bat to update. Times are in your local time zone."}));
 }
 $("synccount").addEventListener("click",e=>{ e.stopPropagation(); $("syncbtn").click(); });

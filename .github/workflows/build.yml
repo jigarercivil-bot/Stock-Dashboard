@@ -2,8 +2,10 @@ name: Build Stock Dashboard
 
 on:
   schedule:
-    # ASX: 06:47 UTC Mon–Fri = 5:47pm Sydney (4:47pm in winter), after the 4pm close.
-    - cron: "47 6 * * 1-5"
+    # ASX: 5:00pm Sydney Mon–Fri, all year. Scheduled at both 06:00 UTC (summer time) and
+    # 07:00 UTC (winter time); the run that isn't 5pm in Sydney skips itself.
+    - cron: "0 6 * * 1-5"
+    - cron: "0 7 * * 1-5"
     # US: 22:17 UTC Sun–Thu = 9:17am Sydney Mon–Fri (8:17am in winter), after the New York close.
     # Monday morning's run picks up Friday's US close, so nothing runs on a Sydney weekend.
     - cron: "17 22 * * 0-4"
@@ -31,19 +33,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
     steps:
+      - name: Run the ASX update only at 5pm Sydney time
+        id: gate
+        run: |
+          if [ "${{ github.event.schedule }}" = "0 6 * * 1-5" ] || [ "${{ github.event.schedule }}" = "0 7 * * 1-5" ]; then
+            h=$(TZ=Australia/Sydney date +%H)
+            if [ "$h" != "17" ]; then echo "Sydney time is ${h}:xx, not 5pm: skipping this one"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
 
       - uses: actions/setup-python@v5
+        if: steps.gate.outputs.skip != 'true'
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install packages
+        if: steps.gate.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
       # Company financials are cached between runs so coverage builds up over time.
       - name: Restore saved data
+        if: steps.gate.outputs.skip != 'true'
         uses: actions/cache/restore@v4
         with:
           path: cache
@@ -51,22 +68,24 @@ jobs:
           restore-keys: market-cache-
 
       - name: Build Stock Dashboard
+        if: steps.gate.outputs.skip != 'true'
         env:
           SEC_CONTACT: ${{ secrets.SEC_CONTACT }}
-          MARKETS: ${{ github.event.schedule == '47 6 * * 1-5' && 'AU' || github.event.schedule == '17 22 * * 0-4' && 'US' || inputs.markets || 'AU,US' }}
+          MARKETS: ${{ (github.event.schedule == '0 6 * * 1-5' || github.event.schedule == '0 7 * * 1-5') && 'AU' || github.event.schedule == '17 22 * * 0-4' && 'US' || inputs.markets || 'AU,US' }}
           FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
         # Gentle mode: one company at a time, pauses between, backs off when Yahoo pushes back,
         # and spends at most 40 minutes per market on company financials.
         run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled --fund-minutes 40 --fund-delay 2
 
       - name: Save data for the next run
-        if: always()
+        if: always() && steps.gate.outputs.skip != 'true'
         uses: actions/cache/save@v4
         with:
           path: cache
           key: market-cache-${{ github.run_id }}
 
       - name: Prepare site
+        if: steps.gate.outputs.skip != 'true'
         run: |
           mkdir -p site/history
           cp output/asx_dashboard_latest.html site/index.html
@@ -74,11 +93,13 @@ jobs:
           echo "Built $(date -u '+%Y-%m-%d %H:%M UTC')" > site/built.txt
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.gate.outputs.skip != 'true'
         with:
           path: site
 
   deploy:
     needs: build
+    if: needs.build.outputs.skip != 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
