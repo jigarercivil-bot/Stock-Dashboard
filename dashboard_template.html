@@ -177,7 +177,9 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 /* ---------- views + value finder ---------- */
 .topline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
 .views{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
-.syncwrap{position:relative;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.syncwrap{position:relative;display:flex;gap:8px;align-items:center;flex-wrap:nowrap;max-width:100%}
+.syncwrap>*{flex:0 0 auto;white-space:nowrap}
+.syncwrap.compact .lg{display:none} .syncwrap.compact .sm{display:inline}
 .viewcount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2)}
 .viewcount[hidden]{display:none!important}
 .sm{display:none}
@@ -599,7 +601,7 @@ const D = /*__DATA__*/null;
     const n=String(j.count).replace(/[^0-9]/g,""); if(!n) return;
     document.getElementById("viewnum").textContent=Number(n).toLocaleString("en-AU");
     document.getElementById("viewword").textContent=n==="1"?" view":" views";
-    document.getElementById("viewcount").hidden=false; }).catch(()=>{}); })();
+    document.getElementById("viewcount").hidden=false; if(window.fitSync) fitSync(); }).catch(()=>{}); })();
 </script>
 <script>
 (function(){
@@ -706,7 +708,7 @@ function renderHero(list){
   const m=movers(list), adv=m.filter(r=>r.chg>0).length, dec=m.filter(r=>r.chg<0).length;
   const lede=$("lede"); lede.replaceChildren();
   const ix=M.indices[0];
-  if(ix) lede.append("The ", el("strong",{text:ix.name}), ` ${ix.chg>=0?"rose":"fell"} `, el("strong",{class:cls(ix.chg),text:pct(Math.abs(ix.chg))}), ". ");
+  if(ix) lede.append("The ", el("strong",{text:ix.name}), ` ${ix.chg>=0?"rose":"fell"} `, el("strong",{class:cls(ix.chg),text:pct(Math.abs(ix.chg)).replace("+","")}), ". ");
   lede.append(`Across the ${m.length.toLocaleString()} stocks in your view, ${adv.toLocaleString()} rose and ${dec.toLocaleString()} fell`);
   const g={}; m.forEach(r=>(g[r.sector]=g[r.sector]||[]).push(r.chg));
   const ranked=Object.entries(g).filter(([,a])=>a.length>=5).map(([s,a])=>[s,median(a)]).sort((a,b)=>b[1]-a[1]);
@@ -1728,6 +1730,9 @@ function renderSync(){
     ? "The ASX updates at 5pm Sydney time, after its 4pm close, and the US after New York's close (the next Sydney morning), Monday to Friday. GitHub sometimes starts a run up to 30 minutes late. Times are in your local time zone."
     : "Built on this computer. Run run_dashboard.bat to update. Times are in your local time zone."}));
 }
+window.fitSync=function(){ const w=document.querySelector(".syncwrap"); if(!w) return; w.classList.remove("compact");
+  if(w.scrollWidth>w.clientWidth+1) w.classList.add("compact"); };
+window.addEventListener("resize",fitSync); requestAnimationFrame(fitSync);
 $("synccount").addEventListener("click",e=>{ e.stopPropagation(); $("syncbtn").click(); });
 $("syncbtn").addEventListener("click",e=>{ e.stopPropagation(); const p=$("syncpop"), open=p.hidden; if(open) renderSync(); p.hidden=!open; $("syncbtn").setAttribute("aria-expanded",String(open)); });
 document.addEventListener("click",e=>{ if(!$("syncpop").hidden&&!e.target.closest(".syncwrap")){ $("syncpop").hidden=true; $("syncbtn").setAttribute("aria-expanded","false"); } });
