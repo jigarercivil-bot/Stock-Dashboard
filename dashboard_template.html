@@ -183,6 +183,14 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 .viewcount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2)}
 .viewcount[hidden]{display:none!important}
 .momtag{font-weight:700;font-size:12.5px;white-space:nowrap}
+.resbar{display:flex;gap:10px;align-items:flex-start;border-radius:12px;padding:11px 14px;margin:0 0 14px;border:1px solid}
+.resbar.pend{background:var(--brass-soft);border-color:color-mix(in srgb,var(--brass) 45%,transparent)}
+.resbar.ok{background:var(--up-soft);border-color:color-mix(in srgb,var(--up) 40%,transparent)}
+.resbar .ico{flex:0 0 auto;width:18px;height:18px;margin-top:1px}
+.resbar b{display:block;font-weight:700} .resbar.pend b{color:var(--brass)} .resbar.ok b{color:var(--up)}
+.resbar .sub{color:var(--text-2);font-size:13.5px} .resbar a{color:var(--text);font-weight:600;margin-left:4px}
+.rtag{font-size:12px;font-weight:700;border-radius:8px;padding:2px 8px;white-space:nowrap}
+.rtag.ok{background:var(--up-soft);color:var(--up)} .rtag.pend{background:var(--brass-soft);color:var(--brass)} .rtag.stale{background:var(--panel-2);color:var(--muted)}
 .sm{display:none}
 @media (max-width:640px){
   .topline{gap:8px}
@@ -1394,6 +1402,35 @@ const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${Str
 const fromEpoch=s=>{ if(!isNum(s)) return null; const d=new Date(s*1000); return isNaN(d)?null:d; };
 function dayLabel(d){ return d.toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short"}); }
 function sectionHead(title,sub,right){ return el("div",{class:"sechead"},el("div",null,el("h2",{text:title}),sub?el("p",{text:sub}):null),right||null); }
+// ---------- new results ----------
+const resFor=code=>(M.results||[]).find(x=>x.code===code);
+const dshort=s=>fmtDate(s,{day:"numeric",month:"short"});
+const daysBetween=(a,b)=>Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/864e5);
+function resTag(x){ if(x.status==="updated") return el("span",{class:"rtag ok",text:"Updated"});
+  if(x.status==="pending") return el("span",{class:"rtag pend",text:`Pending, day ${Math.max(1,daysBetween(x.lodged,M.marketDate)+1)}`});
+  return el("span",{class:"rtag stale",text:"Not updated"}); }
+function resBanner(code,f){ const x=resFor(code); if(!x) return null;
+  const ic=d=>{ const s=sv("svg",{viewBox:"0 0 24 24",class:"ico",fill:"none",stroke:"currentColor","stroke-width":2,"stroke-linecap":"round","stroke-linejoin":"round"}); s.innerHTML=d; return s; };
+  const link=x.url?el("a",{href:x.url,target:"_blank",rel:"noopener",text:"Read report ↗"}):null;
+  const per=f?latestPeriod(f):null;
+  if(x.status==="pending"||x.status==="stale"){ const b=el("div",{class:"resbar pend",style:"color:var(--brass)"},ic('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+      el("div",null,el("b",{text:`${x.kind} lodged ${dshort(x.lodged)}, figures ${x.status==="stale"?"still not updated":"pending"}`}),
+        el("span",{class:"sub",text:`The report is out but Yahoo Finance still shows ${per?per.text.charAt(0).toLowerCase()+per.text.slice(1):"the previous period"}. `+(x.status==="stale"?"Check the report for the new figures.":"Checked again after each close.")}),link));
+    return b; }
+  if(x.status==="updated"&&x.updatedOn&&daysBetween(x.updatedOn,M.marketDate)<=7)
+    return el("div",{class:"resbar ok",style:"color:var(--up)"},ic('<path d="M5 12l5 5L20 7"/>'),
+      el("div",null,el("b",{text:`Updated with the ${x.kind.toLowerCase()} lodged ${dshort(x.lodged)}`}),
+        el("span",{class:"sub",text:`Figures now include ${per?per.text.charAt(0).toLowerCase()+per.text.slice(1):"the new period"}. `}),link));
+  return null; }
+// Newest period in a company's figures, and how to describe it
+function latestPeriod(f){ const ry=(f.rev_y||f.ni_y||[]).filter(p=>p&&p.p), lastFY=ry.length?ry[ry.length-1].p:null;
+  const d=fromEpoch(f.mostRecentQuarter), mq=d?d.toISOString().slice(0,7):null;
+  const endOf=ym=>{ const [y,m]=ym.split("-").map(Number); return new Date(Date.UTC(y,m,0)); };
+  const fmt=dt=>dt.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"2-digit",timeZone:"UTC"});
+  if(mq&&(!lastFY||mq>lastFY)){ const months=lastFY?(+mq.slice(0,4)-+lastFY.slice(0,4))*12+(+mq.slice(5)-+lastFY.slice(5)):null;
+    const kind=months===6?"Half":months===3||months===9?"Quarter":M.id==="US"?"Quarter":"Period";
+    return {text:`${kind} to ${fmt(endOf(mq))}`,lastFY:lastFY?`Year to ${fmt(endOf(lastFY))}`:null}; }
+  return lastFY?{text:`Year to ${fmt(endOf(lastFY))}`,lastFY:`Year to ${fmt(endOf(lastFY))}`}:null; }
 function compactRow(r,right,sub){ return el("li",{class:"crow"},el("span",null,codeBtn(r.code)," ",el("span",{class:"mut",text:r.name})),el("span",{class:"crow-r",text:right||""}),sub?el("span",{class:"crow-s",text:sub}):null); }
 
 // ---------- market brief ----------
@@ -1429,6 +1466,12 @@ function renderBrief(){
   const vc=scoreAll(), byIt=new Map(vc.items.map(it=>[it.r.code,it])), bc=buffettAll().map;
   const cards=[]; const card=(title,desc,items,fmt,empty)=>{ const ul=el("ul",{class:"clist"}); items.slice(0,5).forEach(x=>ul.append(fmt(x)));
     cards.push(el("div",{class:"panel wcard"},el("div",{class:"wc-h"},el("h3",{text:title}),el("span",{class:"pill",text:String(items.length)})),el("p",{class:"note",text:desc}),items.length?ul:el("div",{class:"empty",text:empty}))); };
+  { const wk=(M.results||[]).filter(x=>daysBetween(x.lodged,M.marketDate)<=6&&byCode.get(x.code)&&S.caps.has(byCode.get(x.code).cap));
+    const nu=wk.filter(x=>x.status==="updated").length, np=wk.filter(x=>x.status==="pending").length;
+    card("Results lodged",`Last 7 days: ${nu} updated, ${np} pending. Financials refresh the same evening a report comes out.`,
+      [...wk].sort((a,b)=>(a.status==="pending"?0:1)-(b.status==="pending"?0:1)||b.lodged.localeCompare(a.lodged)),
+      x=>{ const r=byCode.get(x.code); return el("li",{class:"crow"},el("span",null,codeBtn(x.code)," ",el("span",{class:"mut",text:x.kind})),el("span",{class:"crow-r"},resTag(x)),el("span",{class:"crow-s",text:`Lodged ${dshort(x.lodged)}, ${r.name}`})); },
+      "No financial reports lodged in the last 7 days."); }
   if(AU){ const hl=halts.filter(h=>h.kind==="halt").sort((a,b)=>(a.resumeBy||"").localeCompare(b.resumeBy||""));
     card("Trading halts in place","Usually a pending announcement. They often move sharply when trading resumes.",hl,
       h=>{ const r=byCode.get(h.code); return el("li",{class:"crow"},el("span",null,r?codeBtn(h.code):el("b",{text:h.code})," ",el("span",{class:"mut",text:r?r.name:""})),el("span",{class:"crow-r",text:h.resumeBy?`back by ${dayLabel(new Date(h.resumeBy+"T00:00:00"))}`:""})); },"No trading halts in place."); }
@@ -1516,6 +1559,7 @@ function renderCompany(code){
         el("span",{class:"note",text:[r.traded?"today":"did not trade today",isNum(r.offhi)?`${pct(Math.abs(r.offhi),0).replace("+","")} below its 52-week high`:"",isNum(r.relvol)&&r.relvol>=1.5?`${num(r.relvol,1)}× usual volume`:""].filter(Boolean).join(", ")}))),
     el("div",{class:"cactions"},starBtn(code,true),el("button",{class:"iconbtn big",type:"button",text:"Add to portfolio",onclick:()=>{ go("portfolio"); setTimeout(()=>{ const i=$("pf-code"); if(i){ i.value=code; $("pf-qty").focus(); } },50); }}))));
   if(a) host.append(el("div",{class:"annbar"},annTag(a.kind),el("span",null,el("b",{text:`Today ${a.t}: `}),a.head),el("a",{href:`https://www.asx.com.au/markets/trade-our-cash-market/announcements.${code.toLowerCase()}`,target:"_blank",rel:"noopener",text:"Read on ASX ↗"})));
+  const rb=resBanner(code,f); if(rb) host.append(rb);
   const halt=(M.halts||[]).find(h=>h.code===code); if(halt) host.append(el("div",{class:"annbar warnbar"},el("span",{class:"pill",text:halt.kind==="halt"?"Trading halt":"Suspended"}),el("span",{text:`Since ${dayLabel(new Date(halt.since+"T00:00:00"))}. `+(halt.resumeBy?`Due back by ${dayLabel(new Date(halt.resumeBy+"T00:00:00"))} at the latest.`:"No date given to resume.")})));
   // dials
   if(it){ const pc=p=>isNum(it.ps[p])?Math.round(it.ps[p]):null, rel=it.pk==="__all"?"the market":"its sector";
@@ -1557,8 +1601,10 @@ function renderCompany(code){
       ["Free cash flow yield",mm&&isNum(mm.fcfY)?pc1(mm.fcfY):"—"],["Dividend yield",mm&&isNum(mm.divY)?pc1(mm.divY):"—"],["Market cap",money(r.mcap)],["Revenue, 12 months",money(mm?mm.rev:f.totalRevenue)],
       ["Net debt",isNum(debt)&&isNum(cash)?(debt-cash<0?"Net cash "+money(cash-debt):money(debt-cash)):"—"],["Debt to equity",mm&&isNum(mm.de)?num(mm.de,0)+"%":"—"],
       ["Return on equity",isNum(f.returnOnEquity)?pc1(f.returnOnEquity):"—"],["Operating margin",isNum(f.operatingMargins)?pc1(f.operatingMargins):"—"]];
+    const lp=latestPeriod(f);
+    if(lp){ kf.push(["Latest results",lp.text]); if(lp.lastFY&&lp.lastFY!==lp.text) kf.push(["Last full year",lp.lastFY]); }
     if(mm&&mm.mom!=null) kf.push(["Latest results vs a year earlier",momText(mm)||"—"]);
-    const bsd=fromEpoch(f.mostRecentQuarter); if(bsd) kf.push(["Debt and cash as at",fmtDate(bsd.toISOString().slice(0,10),{day:"numeric",month:"short",year:"numeric"})]);
+    if(f.fetched&&f.fetched!=="mock") kf.push(["Financials checked",dshort(f.fetched)]);
     const ex=fromEpoch(f.exDividendDate), er=fromEpoch(f.earningsTimestampStart), today=new Date(M.marketDate+"T00:00:00");
     if(ex&&ex>=today) kf.push(["Next ex-dividend",dayLabel(ex)]); if(er&&er>=today) kf.push(["Next results",dayLabel(er)]);
     R.append(el("section",{class:"panel"},el("h2",{text:"Key figures"}),el("div",{class:"kfig"},...kf.map(([k,v])=>el("div",null,el("div",{class:"k",text:k}),el("div",{class:"v",text:v}))))));
@@ -1751,6 +1797,8 @@ function renderSync(){
     if(st.listed) pop.append(row("Companies priced",`${(st.priced||0).toLocaleString()} of ${st.listed.toLocaleString()} listed`, st.priced/st.listed<0.85?"bad":st.priced/st.listed<0.95?"warnrow":""));
     pop.append(row("Financials on file",f.scope?`${(f.covered??nf).toLocaleString()} of ${f.scope.toLocaleString()} in scope`:`${nf.toLocaleString()} companies`, f.scope&&(f.covered??nf)/f.scope<0.9&&f.stopped==="yahoo"?"warnrow":""));
     if(f.scope&&(f.covered??nf)<f.scope&&f.stopped!=="yahoo") pop.append(el("div",{class:"note",text:"Still filling in: each run adds more until every company in scope is covered."}));
+    { const wk=(m.results||[]).filter(x=>daysBetween(x.lodged,m.marketDate)<=6), nu=wk.filter(x=>x.status==="updated").length, np=wk.filter(x=>x.status==="pending").length;
+      if(m.results) pop.append(row("New results this week",`${nu} updated`+(np?`, ${np} pending`:""),np?"warnrow":"")); }
     if(f.tried!=null) pop.append(row("That run",`${f.fetched} fetched`+(f.failed?`, ${f.failed} failed`:"")+(f.due>f.tried?`, ${(f.due-f.tried).toLocaleString()} still to do`:""), f.failed>f.fetched&&f.failed>5?"bad":""));
     if(D.scheduled){ const nx=schedAt(m.id,now,1); if(nx) pop.append(row("Next update",short(nx))); }
     if(f.stopped==="yahoo") pop.append(el("div",{class:"note",text:"Yahoo limited downloads, so that run stopped early. The rest come on the next runs."}));

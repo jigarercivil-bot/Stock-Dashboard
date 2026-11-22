@@ -547,7 +547,8 @@ def _reset_yahoo_session() -> None:
         pass
 
 
-def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool, gentle: dict | None = None) -> tuple[dict, dict]:
+def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool, gentle: dict | None = None,
+                        force: set[str] | None = None) -> tuple[dict, dict]:
     """Load cached fundamentals and fetch missing/stale ones.
 
     gentle = {"delay": s, "minutes": m} fetches one company at a time with a pause between,
@@ -564,9 +565,14 @@ def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool,
         if not fresh:
             need.append(c)
     mset = set(movers)
-    need.sort(key=lambda c: (c in res, c not in mset))      # missing first, then today's movers
-    budget = len(need) if full else min(len(need), cfg["fund_max_fetch"])
+    forced = [c for c in codes if force and c in force and c not in need]
+    need += forced
+    fset = set(force or ())
+    need.sort(key=lambda c: (c not in fset, c in res, c not in mset))   # new results, missing, then today's movers
+    budget = len(need) if full else min(len(need), max(cfg["fund_max_fetch"], sum(c in fset for c in need)))
     todo = need[:budget]
+    if fset:
+        log(f"  fundamentals: {sum(c in fset for c in need)} companies with new results go first")
     log(f"  fundamentals: {len(codes)} stocks in scope, {len(res)} cached, {len(need)} to fetch"
         + (f", trying up to {len(todo)} now" if budget < len(need) else ""))
     stats = {"scope": len(codes), "due": len(need), "tried": 0, "fetched": 0, "failed": 0, "stopped": None}
@@ -707,6 +713,35 @@ def ann_kind(head: str, types: list) -> str:
     return "Other"
 
 
+FIN_REPORTS = [  # (label, keywords) for reports that bring new financial statements; first match wins
+    ("Half-year report", ["appendix 4d", "half year report", "half-year report", "half yearly report", "half year accounts",
+                          "half-year accounts", "half yearly accounts", "interim report", "half year financial report",
+                          "half-year financial report", "half year results", "half-year results", "hy results", "1h results"]),
+    ("Full-year results", ["appendix 4e", "preliminary final", "full year results", "full-year results", "fy results",
+                           "full year report", "full-year report", "full year accounts", "full year statutory accounts"]),
+    ("Annual report", ["annual report", "annual financial report"]),
+]
+FIN_SKIP = ["notice of", "proxy", "letter to shareholders", "online", "dispatch", "appendix 4g", "corporate governance",
+            "date of", "teleconference", "webcast", "conference call", "briefing", "timing"]
+
+
+def financial_report_kind(head: str, types: list) -> str | None:
+    """Label for announcements that carry new financial statements (not quarterly activity or cash reports)."""
+    text = " " + re.sub(r"[^a-z0-9' ]", " ", (head + " " + " ".join(types or [])).lower()) + " "
+    text = re.sub(r"\s+", " ", text)
+    if any(k in text for k in FIN_SKIP) or "quarterly" in text or "appendix 4c" in text or "appendix 5b" in text:
+        return None
+    for label, kws in FIN_REPORTS:
+        if any(k in text for k in kws):
+            return label
+    if "presentation" not in text:   # short headlines such as "1H FY27 Results" or "FY26 Results"
+        if re.search(r"\b(1h|h1|hy)\s?(fy)?\s?\d{2,4} (results|result|financial report)", text):
+            return "Half-year report"
+        if re.search(r"\b(fy|2h|h2)\s?\d{2,4} (results|result|financial report)", text):
+            return "Full-year results"
+    return None
+
+
 def asx_announcements(market_date, days_back: int = 0) -> list[dict]:
     """Announcements from the market date (Sydney time), newest first. With days_back, also earlier days
     (those carry a "day" field and are only used to rebuild the list of trading halts)."""
@@ -746,8 +781,11 @@ def asx_announcements(market_date, days_back: int = 0) -> list[dict]:
             types = it.get("announcementTypes") or []
             a = {"t": t.strftime("%H:%M"), "code": (it.get("symbol") or "").upper(), "head": head,
                  "kind": ann_kind(head, types), "ps": bool(it.get("isPriceSensitive"))}
+            fin = financial_report_kind(head, types)
+            if fin:
+                a["fin"], a["date"] = fin, t.strftime("%Y-%m-%d")
             if t.date() != day:
-                if a["kind"] not in ("Trading halt", "Suspension", "Reinstatement"):
+                if a["kind"] not in ("Trading halt", "Suspension", "Reinstatement") and not fin:
                     continue
                 a["day"] = t.strftime("%Y-%m-%d")
             out.append(a)
@@ -999,27 +1037,177 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
         raise RuntimeError("no price data came back from Yahoo Finance")
     log(f"{mkt}: {len(m)} stocks, {int(m['traded'].sum())} traded on {mdate:%Y-%m-%d}")
     gentle = {"delay": args.fund_delay, "minutes": args.fund_minutes} if args.fund_minutes else None
-    fund, fstats = ({}, None) if args.no_fundamentals else gather_fundamentals(m, cfg, watch, args.fundamentals_full, gentle)
+    day = pd.Timestamp(mdate).strftime("%Y-%m-%d")
+    # New financial reports (ASX announcements / SEC filings) move those companies to the front of the refresh
+    anns, events, rstate = None, [], load_results(mkt)
+    first_res = not _results_path(mkt).exists()
+    try:
+        if mkt == "AU":
+            first_time = not (CACHE / "halts.json").exists()
+            anns = asx_announcements(mdate, days_back=7 if (first_time or first_res) else 0)
+            events = [{"code": a["code"], "date": a["date"], "kind": a["fin"],
+                       "url": f"https://www.asx.com.au/markets/trade-our-cash-market/announcements.{a['code'].lower()}"}
+                      for a in anns if a.get("fin")]
+            log(f"  financial reports lodged: {len(events)}")
+        else:
+            events = sec_results(mdate, days_back=7 if first_res else 3)
+    except Exception as e:  # noqa: BLE001
+        log(f"  results check skipped: {e}")
+    rstate = merge_results(rstate, events, day)
+    force = results_due(rstate, day)
+    fund, fstats = ({}, None) if args.no_fundamentals else gather_fundamentals(m, cfg, watch, args.fundamentals_full, gentle, force)
+    if fund:
+        rstate = check_results(rstate, fund, day)
+        save_results(mkt, rstate)
     if fund:
         apply_fx(fund, cfg["ccy"])
     idx = index_moves(cfg["indices"])
-    day = pd.Timestamp(mdate).strftime("%Y-%m-%d")
     m.to_csv(HIST / f"{mkt}_{day}.csv", index=False)
     src = ("Prices from Yahoo Finance (end of day, delayed). Company list and market cap from "
            + ("the ASX." if mkt == "AU" else "Nasdaq's stock screener (all NYSE, Nasdaq and NYSE American listings)."))
     stats = {"listed": len(uni), "priced": len(m), "traded": int(m["traded"].sum()), "fund": fstats}
     payload = market_payload(mkt, m, hist, mdate, fund, idx, src, stats)
+    payload["results"] = results_payload(rstate)
     if mkt == "US":
         payload["berkshire"] = berkshire_holdings(m)
     if mkt == "AU":
         try:
-            first_time = not (CACHE / "halts.json").exists()
-            anns = asx_announcements(mdate, days_back=7 if first_time else 0)
+            if anns is None:
+                raise RuntimeError("announcements unavailable")
             payload["announcements"] = [a for a in anns if "day" not in a]
             payload["halts"] = update_halts(anns, m, mdate)
         except Exception as e:  # noqa: BLE001
             log(f"  ASX announcements skipped: {e}")
     return payload
+
+
+# ------------------------------------------------ results-triggered refresh ---
+RESULTS_KEEP_DAYS = 21      # how long a results event stays listed
+RESULTS_RETRY_DAYS = 14     # keep re-checking a pending company for this long
+SEC_FORMS = {"10-Q": "Quarterly report (10-Q)", "10-K": "Annual report (10-K)", "20-F": "Annual report (20-F)",
+             "40-F": "Annual report (40-F)"}
+
+
+def _results_path(mkt):
+    return CACHE / f"results_{mkt}.json"
+
+
+def load_results(mkt) -> dict:
+    try:
+        return json.loads(_results_path(mkt).read_text())
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def merge_results(state: dict, events: list[dict], today: str) -> dict:
+    """events: [{code, date, kind, url}]. A newer report for a company resets it to pending."""
+    for e in events:
+        old = state.get(e["code"])
+        if old and old.get("lodged", "") >= e["date"]:
+            continue
+        state[e["code"]] = {"lodged": e["date"], "kind": e["kind"], "url": e.get("url"), "status": "pending", "tries": 0}
+    cut = (pd.Timestamp(today) - pd.Timedelta(days=RESULTS_KEEP_DAYS)).strftime("%Y-%m-%d")
+    return {c: v for c, v in state.items() if v.get("lodged", "") >= cut}
+
+
+def results_due(state: dict, today: str) -> set[str]:
+    cut = (pd.Timestamp(today) - pd.Timedelta(days=RESULTS_RETRY_DAYS)).strftime("%Y-%m-%d")
+    return {c for c, v in state.items() if v.get("status") == "pending" and v.get("lodged", "") >= cut}
+
+
+def fund_period_end(d: dict) -> str | None:
+    """End date (YYYY-MM-DD) of the newest period in a company's saved financials."""
+    ends = []
+    mrq = d.get("mostRecentQuarter")
+    if isinstance(mrq, (int, float)) and mrq > 0:
+        ends.append(datetime.fromtimestamp(mrq, timezone.utc).strftime("%Y-%m-%d"))
+    for key in ("rev_y", "ni_y"):
+        ser = d.get(key) or []
+        if ser:
+            ends.append((pd.Period(ser[-1]["p"], "M").end_time).strftime("%Y-%m-%d"))
+    return max(ends) if ends else None
+
+
+def check_results(state: dict, fund: dict, today: str) -> dict:
+    """After fetching, mark each pending company updated if its figures now reach the reported period."""
+    retry_cut = (pd.Timestamp(today) - pd.Timedelta(days=RESULTS_RETRY_DAYS)).strftime("%Y-%m-%d")
+    for c, v in state.items():
+        if v.get("status") != "pending":
+            continue
+        d = fund.get(c)
+        if not d:
+            v["status"] = "untracked"          # outside the financials collection
+            continue
+        fetched = str(d.get("fetched") or "")
+        if fetched >= v["lodged"] or fetched == "mock":
+            v["checked"] = today
+            v["tries"] = v.get("tries", 0) + 1
+            end = fund_period_end(d)
+            v["periodEnd"] = end
+            # Reports cover a period that ended at most about four months before they're lodged
+            if end and end >= (pd.Timestamp(v["lodged"]) - pd.Timedelta(days=125)).strftime("%Y-%m-%d"):
+                v["status"], v["updatedOn"] = "updated", today
+                continue
+        if v["lodged"] < retry_cut:
+            v["status"] = "stale"
+    return state
+
+
+def save_results(mkt, state: dict):
+    CACHE.mkdir(parents=True, exist_ok=True)
+    _results_path(mkt).write_text(json.dumps(state, indent=1))
+
+
+def results_payload(state: dict) -> list[dict]:
+    rows = [dict(code=c, **v) for c, v in state.items() if v.get("status") != "untracked"]
+    return sorted(rows, key=lambda r: (r["lodged"], r["code"]), reverse=True)
+
+
+def sec_ticker_map() -> dict:
+    """CIK (int) -> ticker, cached for a week."""
+    f = CACHE / "sec_tickers.json"
+    if f.exists() and time.time() - f.stat().st_mtime < 7 * 86400:
+        return {int(k): v for k, v in json.loads(f.read_text()).items()}
+    j = _sec_get("https://www.sec.gov/files/company_tickers.json").json()
+    out = {}
+    for row in j.values():
+        out.setdefault(int(row["cik_str"]), str(row["ticker"]).upper().replace("-", "."))
+    CACHE.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(out))
+    return out
+
+
+def sec_results(market_date, days_back: int) -> list[dict]:
+    """Quarterly and annual reports filed with the SEC over the last few days (EDGAR daily form index)."""
+    tick = sec_ticker_map()
+    out, day = [], pd.Timestamp(market_date)
+    for i in range(days_back + 1):
+        d = day - pd.Timedelta(days=i)
+        if d.weekday() >= 5:
+            continue
+        url = f"https://www.sec.gov/Archives/edgar/daily-index/{d.year}/QTR{(d.month - 1) // 3 + 1}/form.{d:%Y%m%d}.idx"
+        try:
+            text = _sec_get(url).text
+        except Exception as e:  # noqa: BLE001
+            if "404" not in str(e):
+                log(f"  SEC index {d:%Y-%m-%d}: {e}")
+            continue
+        for line in text.splitlines():
+            form = (line.split() or [""])[0]
+            if form not in SEC_FORMS:
+                continue
+            mt = re.search(r"\s(\d{4,10})\s+(\d{8}|\d{4}-\d{2}-\d{2})\s+(edgar/\S+)\s*$", line)
+            if not mt:
+                continue
+            code = tick.get(int(mt.group(1)))
+            if not code:
+                continue
+            fn = mt.group(3)
+            acc = fn.rsplit("/", 1)[-1].replace(".txt", "")
+            link = f"https://www.sec.gov/Archives/{fn.rsplit('/', 1)[0]}/{acc.replace('-', '')}/{acc}-index.htm"
+            out.append({"code": code, "date": f"{d:%Y-%m-%d}", "kind": SEC_FORMS[form], "url": link})
+    log(f"  SEC filings: {len(out)} quarterly or annual reports over {days_back + 1} days")
+    return out
 
 
 def market_payload(mkt, m, hist, mdate, fund, idx, source, stats=None) -> dict:
@@ -1182,6 +1370,19 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
                      "prevShares": 1000000, "value": 0, "weight": 0, "change": "sold"})
         payload["berkshire"] = {"period": "2026-09-30", "filed": "2026-11-14", "prevPeriod": "2026-06-30",
                                 "accession": "mock", "fetched": "mock", "total": 270e9, "rows": rows}
+    fcodes = list(fund)[:12]
+    today = days[-1].strftime("%Y-%m-%d")
+    ev = []
+    for i, c in enumerate(fcodes[:8]):
+        lod = (days[-1] - pd.Timedelta(days=i % 6)).strftime("%Y-%m-%d")
+        kind = ("Half-year report" if i % 2 else "Annual report") if mkt == "AU" else ("Quarterly report (10-Q)" if i % 3 else "Annual report (10-K)")
+        st = "pending" if i % 3 == 1 else "updated"
+        e = {"code": c, "lodged": lod, "kind": kind, "status": st, "tries": 1 + i % 3, "checked": today,
+             "url": f"https://www.asx.com.au/markets/trade-our-cash-market/announcements.{c.lower()}" if mkt == "AU" else "https://www.sec.gov/"}
+        if st == "updated":
+            e["updatedOn"] = today
+        ev.append(e)
+    payload["results"] = ev
     return payload
 
 
