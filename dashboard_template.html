@@ -1447,10 +1447,30 @@ function halfPanel(f){ const ep=f.ep; if(!ep) return null;
   if(ep.behind) sec.append(el("p",{class:"note",text:"Eulerpool hasn't added this company's latest reported period yet."}));
   sec.append(el("p",{class:"note",text:`Half-years from Eulerpool, checked against full-year totals${ep.fetched?`; fetched ${dshort(ep.fetched)}`:""}.`}));
   return sec; }
+// Quarterly results from SEC filings (US)
+function quarterPanel(f){ const q=f.q; if(!q||!q.rows||!q.rows.length) return null;
+  const mo=v=>isNum(v)?money(v*1e6):"—", D=p=>new Date(p+"T00:00:00");
+  const rows=[...q.rows].reverse().slice(0,5);
+  const yearAgo=r=>q.rows.find(x=>{ const d=(D(r.p)-D(x.p))/864e5; return d>=350&&d<=380; });
+  const yoy=(a,b)=>isNum(a)&&isNum(b)&&b!==0&&Math.sign(a)===Math.sign(b)?(a-b)/Math.abs(b):null;
+  const lab=p=>perLab(p.slice(0,7));
+  const t=el("table",{class:"htable"}); t.append(el("thead",null,el("tr",null,...[["Quarter to"],["Revenue"],["Growth","Revenue against the same quarter a year earlier"],["Profit","Net profit"],["Cash flow","Operating cash flow"]].map(([h,tt],i)=>el("th",{class:i?"num":"",text:h,title:tt||null})))));
+  const tb=el("tbody"); rows.forEach(r=>{ const py=yearAgo(r), g=py?yoy(r.rev,py.rev):null, gn=py?yoy(r.ni,py.ni):null;
+    tb.append(el("tr",null,el("td",{text:lab(r.p)}),el("td",{class:"num",text:mo(r.rev)}),el("td",{class:"num "+cls(g),text:isNum(g)?pct(g*100,0):"—"}),
+      el("td",{class:"num "+(isNum(r.ni)&&r.ni<0?"down":""),text:mo(r.ni),title:isNum(gn)?`Profit ${pct(gn*100,0)} on a year earlier`:null}),el("td",{class:"num",text:mo(r.ocf)}))); });
+  t.append(tb);
+  const last=q.rows[q.rows.length-1], ttm=q.rows.slice(-4), full=ttm.length===4&&ttm.every(r=>isNum(r.rev))&&(D(ttm[3].p)-D(ttm[0].p))/864e5<300;
+  const sec=el("section",{class:"panel"},el("h2",{text:"Quarterly results"}),el("div",{class:"tblwrap"},t));
+  const bits=[]; if(isNum(last.cash)) bits.push(`cash ${mo(last.cash)}`); if(isNum(last.debt)) bits.push(`long-term debt ${mo(last.debt)}`);
+  if(bits.length) sec.append(el("p",{class:"note",text:`At ${D(last.p).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}: ${bits.join(", ")}.`}));
+  if(full) sec.append(el("p",{class:"note",text:`Last four quarters: revenue ${mo(ttm.reduce((a,r)=>a+r.rev,0))}, profit ${mo(ttm.reduce((a,r)=>a+(r.ni||0),0))}.`}));
+  sec.append(el("p",{class:"note",text:`From the company's SEC filings${q.fetched?`, checked ${dshort(q.fetched)}`:""}. Growth compares with the same quarter a year earlier; cash flow is from operations.`}));
+  return sec; }
 // Newest period in a company's figures, and how to describe it
 function latestPeriod(f){ const ry=(f.rev_y||f.ni_y||[]).filter(p=>p&&p.p), lastFY=ry.length?ry[ry.length-1].p:null;
   const d=fromEpoch(f.mostRecentQuarter); let mq=d?d.toISOString().slice(0,7):null;
   const ep=f.ep&&f.ep.ok&&f.ep.rows&&f.ep.rows.length?f.ep.rows[f.ep.rows.length-1].p.slice(0,7):null; if(ep&&(!mq||ep>mq)) mq=ep;
+  const sq=f.q&&f.q.rows&&f.q.rows.length?f.q.rows[f.q.rows.length-1].p.slice(0,7):null; if(sq&&(!mq||sq>mq)) mq=sq;
   const endOf=ym=>{ const [y,m]=ym.split("-").map(Number); return new Date(Date.UTC(y,m,0)); };
   const fmt=dt=>dt.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"2-digit",timeZone:"UTC"});
   if(mq&&(!lastFY||mq>lastFY)){ const months=lastFY?(+mq.slice(0,4)-+lastFY.slice(0,4))*12+(+mq.slice(5)-+lastFY.slice(5)):null;
@@ -1634,7 +1654,7 @@ function renderCompany(code){
     const ex=fromEpoch(f.exDividendDate), er=fromEpoch(f.earningsTimestampStart), today=new Date(M.marketDate+"T00:00:00");
     if(ex&&ex>=today) kf.push(["Next ex-dividend",dayLabel(ex)]); if(er&&er>=today) kf.push(["Next results",dayLabel(er)]);
     R.append(el("section",{class:"panel"},el("h2",{text:"Key figures"}),el("div",{class:"kfig"},...kf.map(([k,v])=>el("div",null,el("div",{class:"k",text:k}),el("div",{class:"v",text:v}))))));
-    const hp=M.id==="AU"?halfPanel(f):null; if(hp) R.append(hp);
+    const hp=M.id==="AU"?halfPanel(f):quarterPanel(f); if(hp) R.append(hp);
     const fxNote=isNum(f.fx)&&f.fx!==1&&f.fin_ccy?` (${f.fin_ccy})`:"";
     const fh=el("section",{class:"panel"},el("h2",{text:"Financial health"+fxNote}));
     [["Revenue",f.rev_y,"rev"],["Net income",f.ni_y,"ni"],["Free cash flow",f.fcf_y,null],["Total debt",f.debt_y,"debt"]].forEach(([t,s,k])=>{ const h=el("div"); fh.append(el("h3",{text:t}),h); const ex=k?latestBar(f,s,k):null; later.push(()=>h.replaceChildren(barChart(s,Math.max(220,h.clientWidth),t,ex))); });
@@ -1654,7 +1674,7 @@ function renderCompany(code){
       el("td",{class:"num",text:isNum(x.m.ndEbitda)?(x.m.ndEbitda<0?"Net cash":num(x.m.ndEbitda,1)+"×"):"—"}),el("td",{class:"num",text:bb?`${bb.passed} of ${bb.evaluated}`:"—"}),el("td",{class:"num"},chgNode(x.r.traded?x.r.chg:null)))); });
     t.append(tb); host.append(el("section",{class:"panel"},el("h2",{text:"Against its peers"}),el("p",{class:"note",text:`Closest in size within ${ps[0].r.group===r.group?r.group:r.sector}.`}),el("div",{class:"tblwrap"},t))); } }
   host.append(links(r,f));
-  host.append(el("p",{class:"note",text:"Figures from Yahoo Finance"+(f?`, fetched ${f.fetched}`:"")+(f&&f.ep?"; half-years from Eulerpool":"")+(M.id==="AU"?"; announcements and halts from the ASX":"")+". They describe the numbers; they aren't buy or sell advice."}));
+  host.append(el("p",{class:"note",text:"Figures from Yahoo Finance"+(f?`, fetched ${f.fetched}`:"")+(f&&f.ep?"; half-years from Eulerpool":"")+(f&&f.q?"; quarters from SEC filings":"")+(M.id==="AU"?"; announcements and halts from the ASX":"")+". They describe the numbers; they aren't buy or sell advice."}));
   requestAnimationFrame(()=>later.forEach(fn=>fn()));
 }
 

@@ -1716,6 +1716,15 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
             e["updatedOn"] = today
         ev.append(e)
     payload["results"] = ev
+    if mkt == "US":   # SEC quarters
+        for i, c in enumerate(list(fund)[:40]):
+            f = fund[c]; ry = f.get("rev_y") or []
+            if not ry:
+                continue
+            base = ry[-1]["v"] / 4e6
+            ends = ["2024-09-30", "2024-12-31", "2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31", "2026-03-31", "2026-06-30", "2026-09-30"]
+            f["q"] = {"fetched": today, "rows": [{"p": e, "rev": round(base * (0.85 + 0.03 * j), 1), "ni": round(base * 0.15 * (0.9 + 0.04 * j), 1),
+                                                   "ocf": round(base * 0.2, 1), "cash": round(base * 1.4, 1), "debt": round(base * 2, 1)} for j, e in enumerate(ends)]}
     if mkt == "AU":   # Eulerpool half-years: one good, one that fails the check, one with a source disagreement
         for i, c in enumerate(list(fund)[:30]):
             f = fund[c]; ry = f.get("rev_y") or []
