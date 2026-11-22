@@ -548,7 +548,7 @@ def _reset_yahoo_session() -> None:
 
 
 def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool, gentle: dict | None = None,
-                        force: set[str] | None = None) -> tuple[dict, dict]:
+                        force: dict | None = None) -> tuple[dict, dict]:
     """Load cached fundamentals and fetch missing/stale ones.
 
     gentle = {"delay": s, "minutes": m} fetches one company at a time with a pause between,
@@ -565,9 +565,9 @@ def gather_fundamentals(m: pd.DataFrame, cfg: dict, watch: set[str], full: bool,
         if not fresh:
             need.append(c)
     mset = set(movers)
-    forced = [c for c in codes if force and c in force and c not in need]
-    need += forced
-    fset = set(force or ())
+    # companies with new reports, unless their saved figures were fetched after the report came out
+    fset = {c for c in (force or {}) if c in set(codes) and str((res.get(c) or {}).get("fetched", "")) < force[c]}
+    need += [c for c in codes if c in fset and c not in need]
     need.sort(key=lambda c: (c not in fset, c in res, c not in mset))   # new results, missing, then today's movers
     budget = len(need) if full else min(len(need), max(cfg["fund_max_fetch"], sum(c in fset for c in need)))
     todo = need[:budget]
@@ -1110,9 +1110,11 @@ def merge_results(state: dict, events: list[dict], today: str) -> dict:
     return {c: v for c, v in state.items() if v.get("lodged", "") >= cut}
 
 
-def results_due(state: dict, today: str) -> set[str]:
+def results_due(state: dict, today: str) -> dict[str, str]:
+    """Pending companies -> date their report was lodged (refetched unless already fetched today)."""
     cut = (pd.Timestamp(today) - pd.Timedelta(days=RESULTS_RETRY_DAYS)).strftime("%Y-%m-%d")
-    return {c for c, v in state.items() if v.get("status") == "pending" and v.get("lodged", "") >= cut}
+    return {c: v["lodged"] for c, v in state.items() if v.get("status") == "pending" and v.get("lodged", "") >= cut
+            and v.get("checked") != today}
 
 
 def fund_period_end(d: dict) -> str | None:
