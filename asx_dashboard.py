@@ -1329,13 +1329,17 @@ def _secq_instant(entries: list[dict]) -> dict:
 def sec_quarters(facts: dict) -> dict | None:
     gaap = (facts.get("facts") or {}).get("us-gaap") or {}
     def pick(tags, fn):
-        best = {}
-        for t in tags:
-            ents = ((gaap.get(t) or {}).get("units") or {}).get("USD") or []
-            vals = fn(ents)
-            if vals and (not best or max(vals) > max(best)):
-                best = vals                  # the tag reported most recently wins
-        return best
+        """Merge the candidate tags (companies switch tags over the years); earlier tags win on overlap."""
+        found = [fn(((gaap.get(t) or {}).get("units") or {}).get("USD") or []) for t in tags]
+        found = [v for v in found if v]
+        if not found:
+            return {}
+        primary = max(found, key=lambda v: max(v))      # the tag used in the latest filing leads
+        merged = dict(primary)
+        for v in found:                                  # older periods filed under other tags fill gaps
+            for k, x in v.items():
+                merged.setdefault(k, x)
+        return merged
     series = {k: pick(v, _secq_flow) for k, v in SECQ_TAGS.items()}
     series.update({k: pick(v, _secq_instant) for k, v in SECQ_INSTANT.items()})
     ends = sorted(set(series["rev"]) | set(series["ni"]))
