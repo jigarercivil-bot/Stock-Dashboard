@@ -77,6 +77,7 @@ jobs:
           SEC_CONTACT: ${{ secrets.SEC_CONTACT }}
           EULERPOOL_API_KEY: ${{ secrets.EULERPOOL_API_KEY }}
           EP_MINUTES: ${{ inputs.fund_minutes && '120' || '25' }}
+          SECQ_MINUTES: ${{ inputs.fund_minutes && '150' || '30' }}
           MARKETS: ${{ (github.event.schedule == '0 6 * * 1-5' || github.event.schedule == '0 7 * * 1-5') && 'AU' || github.event.schedule == '17 22 * * 0-4' && 'US' || inputs.markets || 'AU,US' }}
           FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
           FUND_MINUTES: ${{ inputs.fund_minutes || '40' }}

@@ -1063,6 +1063,12 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
                 fund[c]["ep"] = v
         except Exception as e:  # noqa: BLE001
             log(f"  Eulerpool skipped: {e}")
+    if fund and mkt == "US" and not args.no_fundamentals:
+        try:
+            for c, v in gather_sec_quarters(list(fund), force, float(os.environ.get("SECQ_MINUTES", "30"))).items():
+                fund[c]["q"] = v
+        except Exception as e:  # noqa: BLE001
+            log(f"  SEC quarters skipped: {e}")
     if fund:
         rstate = check_results(rstate, fund, day)
         save_results(mkt, rstate)
@@ -1260,6 +1266,142 @@ def gather_eulerpool(codes: list[str], fund: dict, force: set[str], minutes: flo
     return out
 
 
+# ------------------------------------------------ US quarterly results (SEC) ---
+SECQ_DIR = CACHE / "sec_quarters"
+SECQ_TTL_DAYS = 45
+SECQ_TAGS = {
+    "rev": ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet",
+            "RevenueFromContractWithCustomerIncludingAssessedTax", "RevenuesNetOfInterestExpense", "TotalRevenuesAndOtherIncome"],
+    "ni": ["NetIncomeLoss", "ProfitLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"],
+    "ocf": ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"],
+}
+SECQ_INSTANT = {
+    "cash": ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "Cash"],
+    "debt": ["LongTermDebt", "LongTermDebtNoncurrent", "DebtInstrumentCarryingAmount"],
+}
+
+
+def _days(a: str, b: str) -> int:
+    return (pd.Timestamp(b) - pd.Timestamp(a)).days
+
+
+def _secq_flow(entries: list[dict]) -> dict:
+    """Quarter values (end date -> value) from duration facts: 3-month figures where filed,
+    otherwise the difference between year-to-date figures that share a start date."""
+    latest = {}
+    for e in entries:
+        if "start" not in e or e.get("val") is None:
+            continue
+        k = (e["start"], e["end"])
+        if k not in latest or e.get("filed", "") > latest[k].get("filed", ""):
+            latest[k] = e
+    direct, by_start = {}, {}
+    for (st, en), e in latest.items():
+        d = _days(st, en)
+        if 80 <= d <= 100:
+            direct[en] = float(e["val"])
+        if 80 <= d <= 380:
+            by_start.setdefault(st, []).append((en, float(e["val"])))
+    derived = {}
+    for st, rows in by_start.items():
+        rows.sort()
+        prev_end, prev_val = None, 0.0
+        for en, v in rows:
+            span = _days(prev_end or st, en)
+            if 80 <= span <= 100:
+                derived[en] = v - prev_val
+            prev_end, prev_val = en, v
+    out = dict(derived)
+    out.update(direct)
+    return out
+
+
+def _secq_instant(entries: list[dict]) -> dict:
+    out = {}
+    for e in entries:
+        if "start" in e or e.get("val") is None:
+            continue
+        if e["end"] not in out or e.get("filed", "") > out[e["end"]][1]:
+            out[e["end"]] = (float(e["val"]), e.get("filed", ""))
+    return {k: v[0] for k, v in out.items()}
+
+
+def sec_quarters(facts: dict) -> dict | None:
+    gaap = (facts.get("facts") or {}).get("us-gaap") or {}
+    def pick(tags, fn):
+        best = {}
+        for t in tags:
+            ents = ((gaap.get(t) or {}).get("units") or {}).get("USD") or []
+            vals = fn(ents)
+            if vals and (not best or max(vals) > max(best)):
+                best = vals                  # the tag reported most recently wins
+        return best
+    series = {k: pick(v, _secq_flow) for k, v in SECQ_TAGS.items()}
+    series.update({k: pick(v, _secq_instant) for k, v in SECQ_INSTANT.items()})
+    ends = sorted(set(series["rev"]) | set(series["ni"]))
+    if not ends:
+        return None
+    rows = []
+    for en in ends[-9:]:
+        r = {"p": en}
+        for k in ("rev", "ni", "ocf", "cash", "debt"):
+            v = series[k].get(en)
+            r[k] = fnum(v / 1e6, 3) if v is not None else None
+        rows.append(r)
+    return {"rows": rows, "fetched": datetime.now().strftime("%Y-%m-%d")}
+
+
+def gather_sec_quarters(codes: list[str], force: dict, minutes: float) -> dict:
+    """Quarterly figures for US companies from the SEC's company facts, refreshed when they file."""
+    SECQ_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        cik_of = {t: c for c, t in sec_ticker_map().items()}
+    except Exception as e:  # noqa: BLE001
+        log(f"  SEC quarters skipped: {e}")
+        return {}
+    have, need = {}, []
+    for c in codes:
+        fp = SECQ_DIR / f"{c}.json"
+        d = None
+        if fp.exists():
+            try:
+                d = json.loads(fp.read_text())
+            except Exception:  # noqa: BLE001
+                d = None
+        if d is not None:
+            have[c] = d
+        if c not in cik_of:
+            continue
+        stale = d is None or (time.time() - fp.stat().st_mtime) / 86400 > SECQ_TTL_DAYS
+        if stale or (c in force and str((d or {}).get("fetched", "")) < force[c]):
+            need.append(c)
+    need.sort(key=lambda c: (c not in force, c in have))
+    t_end, got, failed = time.time() + minutes * 60, 0, 0
+    for c in need:
+        if time.time() > t_end:
+            log(f"  SEC quarters: time limit reached after {got}; the rest come on the next runs")
+            break
+        try:
+            facts = _sec_get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_of[c]:010d}.json").json()
+            d = sec_quarters(facts) or {"rows": [], "fetched": datetime.now().strftime("%Y-%m-%d")}
+            (SECQ_DIR / f"{c}.json").write_text(json.dumps(d))
+            have[c] = d
+            got += 1
+        except Exception as e:  # noqa: BLE001
+            failed += 1
+            if "404" in str(e):          # no XBRL facts (e.g. some foreign filers): don't retry for a while
+                (SECQ_DIR / f"{c}.json").write_text(json.dumps({"rows": [], "fetched": datetime.now().strftime("%Y-%m-%d")}))
+            elif failed <= 5:
+                log(f"  SEC quarters {c}: {e}")
+    n = sum(1 for d in have.values() if d.get("rows"))
+    log(f"  SEC quarters: {got} fetched this run, {n} companies with quarterly figures")
+    for c in os.environ.get("SECQ_LOG_CODES", "AAPL,MSFT,JPM,XOM,KO,NVDA").split(","):
+        d = have.get(c)
+        if d and d.get("rows"):
+            log("    " + c + ": " + "; ".join(f"{r['p']} rev {r['rev']} ni {r['ni']} ocf {r['ocf']}" for r in d["rows"][-5:]))
+    return {c: d for c, d in have.items() if d.get("rows")}
+
+
 # ------------------------------------------------ results-triggered refresh ---
 RESULTS_KEEP_DAYS = 21      # how long a results event stays listed
 RESULTS_RETRY_DAYS = 14     # keep re-checking a pending company for this long
@@ -1302,6 +1444,9 @@ def fund_period_end(d: dict) -> str | None:
     ep = d.get("ep") or {}
     if ep.get("ok") and ep.get("rows"):
         ends.append(ep["rows"][-1]["p"])
+    q = d.get("q") or {}
+    if q.get("rows"):
+        ends.append(q["rows"][-1]["p"])
     mrq = d.get("mostRecentQuarter")
     if isinstance(mrq, (int, float)) and mrq > 0:
         ends.append(datetime.fromtimestamp(mrq, timezone.utc).strftime("%Y-%m-%d"))
