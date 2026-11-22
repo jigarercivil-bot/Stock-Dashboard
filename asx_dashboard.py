@@ -435,7 +435,7 @@ INFO_FIELDS = ["trailingPE", "forwardPE", "priceToBook", "trailingEps", "forward
                "trailingAnnualDividendYield", "dividendYield", "payoutRatio", "trailingPegRatio",
                "targetMeanPrice", "numberOfAnalystOpinions", "heldPercentInsiders", "sharesOutstanding", "beta",
                "exDividendDate", "lastDividendValue", "dividendRate", "earningsTimestampStart",
-               "mostRecentQuarter"]
+               "mostRecentQuarter", "netIncomeToCommon"]
 
 
 class RateLimited(Exception):
@@ -460,6 +460,8 @@ def load_cached_fund(yahoo: str):
     if d.get("v") != FUND_VERSION:
         d["v"] = FUND_VERSION          # usable now; marked stale so it gets the new fields soon
         return d, False
+    if "mostRecentQuarter" not in d and d.get("fetched") != "mock":
+        return d, False                # missing the latest-period fields: refresh soon
     return d, time.time() - f.stat().st_mtime < FUND_TTL_DAYS * 86400
 
 
@@ -1162,7 +1164,8 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
             f["exDividendDate"], f["lastDividendValue"] = ts + 86400 * (i % 5), round(rng.uniform(0.05, 1.2), 3)
         if i % 37 == 0:
             f["earningsTimestampStart"] = ts + 86400 * (i % 4)
-        f["mostRecentQuarter"] = int(pd.Timestamp("2025-12-31").timestamp())
+        f["mostRecentQuarter"] = int(pd.Timestamp("2026-09-30" if mkt == "US" else "2025-12-31").timestamp())
+        f["netIncomeToCommon"] = fnum((f.get("ni_y") or [{}])[-1].get("v", 0) * rng.uniform(0.85, 1.25), 0)
     if mkt == "US":
         picks = m.sort_values("mcap", ascending=False).head(45)
         w = [rng.uniform(0.2, 1) ** 3 for _ in range(len(picks))]

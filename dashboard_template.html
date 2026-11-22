@@ -880,18 +880,29 @@ function lineChart(host,pts,w){
     showTip(e,`${best.d.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}\n${CUR}${price(best.c)}, ${pct((best.c/pts[0].c-1)*100,1)} over this range`); });
   hit.addEventListener("mouseleave",()=>{ cross.setAttribute("opacity",0); dot.setAttribute("opacity",0); hideTip(); });
   host.append(s); }
-function barChart(series,w,label){
-  const box=el("div"), v=(series||[]).filter(p=>isNum(p.v));
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const perLab=p=>{ const m=/^(\d{4})-(\d{2})$/.exec(p||""); return m?`${MON[+m[2]-1]} ${m[1].slice(2)}`:p; };
+const perLong=p=>{ const m=/^(\d{4})-(\d{2})$/.exec(p||""); return m?`${["January","February","March","April","May","June","July","August","September","October","November","December"][+m[2]-1]} ${m[1]}`:p; };
+// A "latest" bar from Yahoo's trailing figures, shown only when they run past the last annual report
+function latestBar(f,series,kind){
+  const d=fromEpoch(f.mostRecentQuarter); if(!d) return null;
+  const end=d.toISOString().slice(0,7), last=(series||[]).filter(p=>isNum(p.v)).slice(-1)[0];
+  if(last&&last.p>=end) return null;
+  const v=kind==="rev"?f.totalRevenue:kind==="ni"?f.netIncomeToCommon:kind==="debt"?f.totalDebt:null; if(!isNum(v)) return null;
+  return {p:end,v,latest:kind==="debt"?"as at":"12 months to"}; }
+function barChart(series,w,label,extra){
+  const box=el("div"), v=(series||[]).filter(p=>isNum(p.v)).concat(extra?[extra]:[]);
   if(!v.length){ box.append(el("div",{class:"empty",text:"Yahoo Finance has no figures for this."})); return box; }
   const h=150,m={l:6,r:6,t:18,b:22}, mx=Math.max(0,...v.map(p=>p.v)), mn=Math.min(0,...v.map(p=>p.v)), rng=(mx-mn)||1;
   const Y=x=>m.t+(mx-x)/rng*(h-m.t-m.b), bw=(w-m.l-m.r)/v.length, barW=Math.min(44,bw*.6);
   const s=sv("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`,style:"display:block"});
   s.append(sv("line",{x1:m.l,x2:w-m.r,y1:Y(0),y2:Y(0),stroke:"var(--line-2)"}));
   v.forEach((p,i)=>{ const cx=m.l+bw*i+bw/2, y=Math.min(Y(p.v),Y(0)), bh=Math.max(1.5,Math.abs(Y(p.v)-Y(0)));
-    const r=sv("rect",{x:cx-barW/2,y,width:barW,height:bh,rx:4,fill:p.v>=0?"var(--brass)":"var(--down-bar)"});
-    r.addEventListener("mousemove",e=>showTip(e,`${label}, period ending ${p.p}\n${money(p.v)}`)); r.addEventListener("mouseleave",hideTip); s.append(r);
+    const col=p.v>=0?"var(--brass)":"var(--down-bar)";
+    const r=sv("rect",{x:cx-barW/2,y,width:barW,height:bh,rx:4,fill:col,...(p.latest?{"fill-opacity":.35,stroke:col,"stroke-width":1.5,"stroke-dasharray":"4 3"}:{})});
+    r.addEventListener("mousemove",e=>showTip(e,p.latest?`${label}, ${p.latest} ${perLong(p.p)} (latest)\n${money(p.v)}`:`${label}, year ending ${perLong(p.p)}\n${money(p.v)}`)); r.addEventListener("mouseleave",hideTip); s.append(r);
     const tv=sv("text",{x:cx,y:p.v>=0?y-5:Y(0)-5,"font-size":10.5,"font-weight":600,fill:"var(--text-2)","text-anchor":"middle"}); tv.textContent=money(p.v).replace(CUR,""); s.append(tv);
-    const tl=sv("text",{x:cx,y:h-6,"font-size":11,fill:"var(--muted)","text-anchor":"middle"}); tl.textContent=p.p; s.append(tl); });
+    const tl=sv("text",{x:cx,y:h-6,"font-size":11,fill:"var(--muted)","text-anchor":"middle"}); tl.textContent=p.latest?"Latest":perLab(p.p); if(p.latest) tl.setAttribute("font-weight",700); s.append(tl); });
   box.append(s); return box; }
 function stat(k,v,c){ return el("div",{class:"stat"},el("div",{class:"k",text:k}),el("div",{class:"v "+(c||""),text:v})); }
 const lastV=s=>{ const v=(s||[]).filter(p=>isNum(p.v)); return v.length?v[v.length-1].v:null; };
@@ -1553,7 +1564,8 @@ function renderCompany(code){
     R.append(el("section",{class:"panel"},el("h2",{text:"Key figures"}),el("div",{class:"kfig"},...kf.map(([k,v])=>el("div",null,el("div",{class:"k",text:k}),el("div",{class:"v",text:v}))))));
     const fxNote=isNum(f.fx)&&f.fx!==1&&f.fin_ccy?` (${f.fin_ccy})`:"";
     const fh=el("section",{class:"panel"},el("h2",{text:"Financial health"+fxNote}));
-    [["Revenue",f.rev_y],["Net income",f.ni_y],["Free cash flow",f.fcf_y],["Total debt",f.debt_y]].forEach(([t,s])=>{ const h=el("div"); fh.append(el("h3",{text:t}),h); later.push(()=>h.replaceChildren(barChart(s,Math.max(220,h.clientWidth),t))); });
+    [["Revenue",f.rev_y,"rev"],["Net income",f.ni_y,"ni"],["Free cash flow",f.fcf_y,null],["Total debt",f.debt_y,"debt"]].forEach(([t,s,k])=>{ const h=el("div"); fh.append(el("h3",{text:t}),h); const ex=k?latestBar(f,s,k):null; later.push(()=>h.replaceChildren(barChart(s,Math.max(220,h.clientWidth),t,ex))); });
+    fh.append(el("p",{class:"note",text:"Solid bars are full financial years. A dashed \"Latest\" bar shows the most recent 12 months (or, for debt, the latest balance sheet) when it runs past the last annual report."}));
     R.append(fh);
     if(b&&b.evaluated>=4){ const ul=el("ul",{class:"checklist",style:"grid-template-columns:1fr"});
       BUFFETT.forEach(c=>{ const v=b.res[c.id]; ul.append(el("li",{title:b.val[c.id]||"not enough data"},el("span",{class:v===true?"ok":v===false?"no":"na",text:v===true?"✓":v===false?"✗":"–"}),el("span",null,el("b",{text:c.name}),el("small",{class:"mut",style:"display:block",text:b.val[c.id]||"not enough data"})))); });
