@@ -189,6 +189,7 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 .resbar .ico{flex:0 0 auto;width:18px;height:18px;margin-top:1px}
 .resbar b{display:block;font-weight:700} .resbar.pend b{color:var(--brass)} .resbar.ok b{color:var(--up)}
 .resbar .sub{color:var(--text-2);font-size:13.5px} .resbar a{color:var(--text);font-weight:600;margin-left:4px}
+.htable th,.htable td{padding:8px 5px;font-size:13px;white-space:nowrap} .htable th:first-child,.htable td:first-child{padding-left:0}
 .rtag{font-size:12px;font-weight:700;border-radius:8px;padding:2px 8px;white-space:nowrap}
 .rtag.ok{background:var(--up-soft);color:var(--up)} .rtag.pend{background:var(--brass-soft);color:var(--brass)} .rtag.stale{background:var(--panel-2);color:var(--muted)}
 .sm{display:none}
@@ -1422,9 +1423,34 @@ function resBanner(code,f){ const x=resFor(code); if(!x) return null;
       el("div",null,el("b",{text:`Updated with the ${x.kind.toLowerCase()} lodged ${dshort(x.lodged)}`}),
         el("span",{class:"sub",text:`Figures now include ${per?per.text.charAt(0).toLowerCase()+per.text.slice(1):"the new period"}. `}),link));
   return null; }
+// Half-year results from Eulerpool (ASX), shown only when they pass the cross-checks
+function halfPanel(f){ const ep=f.ep; if(!ep) return null;
+  const sec=el("section",{class:"panel"},el("h2",{text:"Half-year results"}));
+  const k=ep.ccy==="AUD"?1:(ep.ccy&&ep.ccy===f.fin_ccy&&isNum(f.fx)?f.fx:null), unit=k==null&&ep.ccy?` (${ep.ccy})`:"";
+  const mo=v=>isNum(v)?(k==null?num(v,0)+"M":money(v*1e6*k)):"—";
+  const fmtH=p=>new Date(p+"T00:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"2-digit"});
+  if(ep.ok&&ep.rows&&ep.rows.length){
+    const rows=[...ep.rows].reverse().slice(0,4), byP=new Map(ep.rows.map(r=>[r.p.slice(0,7),r]));
+    const prevYr=p=>{ const [y,m]=p.slice(0,7).split("-"); return byP.get(`${+y-1}-${m}`); };
+    const yoy=(a,b)=>isNum(a)&&isNum(b)&&b!==0&&Math.sign(a)===Math.sign(b)?(a-b)/Math.abs(b):null;
+    const t=el("table",{class:"htable"}); t.append(el("thead",null,el("tr",null,...[["Half to"],["Revenue"+unit],["Growth","Revenue against the same half a year earlier"],["Profit"+unit,"Net profit"],["Cash flow"+unit,"Operating cash flow"]].map(([h,tt],i)=>el("th",{class:i?"num":"",text:h,title:tt||null})))));
+    const tb=el("tbody"); rows.forEach(r=>{ const py=prevYr(r.p), g=py?yoy(r.rev,py.rev):null;
+      tb.append(el("tr",null,el("td",{text:perLab(r.p.slice(0,7))}),el("td",{class:"num",text:mo(r.rev)}),el("td",{class:"num "+cls(g),text:isNum(g)?pct(g*100,0):"—"}),
+        el("td",{class:"num "+(isNum(r.ni)&&r.ni<0?"down":""),text:mo(r.ni)}),el("td",{class:"num",text:mo(r.ocf)}))); });
+    t.append(tb); sec.append(el("div",{class:"tblwrap"},t));
+    sec.append(el("p",{class:"note",text:"Growth compares revenue with the same half a year earlier. Cash flow is from operations."}));
+    if(ep.newer) sec.append(el("p",{class:"note",text:"The latest half here is newer than the yearly figures from Yahoo Finance."}));
+  } else sec.append(el("p",{class:"empty",text:ep.checked?"Hidden: the half-year figures on file don't add up to the full-year total, so they can't be trusted for this company.":"Not enough half-year figures on file to check them against a full year."}));
+  if(ep.disagree){ const d=ep.disagree, kk=k==null?1:k;
+    sec.append(el("div",{class:"resbar pend",style:"color:var(--brass);margin:12px 0 0"},el("div",null,el("b",{text:`Sources disagree on revenue for the year to ${perLong(d.p)}`}),
+      el("span",{class:"sub",text:`Yahoo Finance ${mo(d.yf)}, Eulerpool ${mo(d.ep)}. Check the annual report before relying on revenue-based figures.`})))); }
+  if(ep.behind) sec.append(el("p",{class:"note",text:"Eulerpool hasn't added this company's latest reported period yet."}));
+  sec.append(el("p",{class:"note",text:`Half-years from Eulerpool, checked against full-year totals${ep.fetched?`; fetched ${dshort(ep.fetched)}`:""}.`}));
+  return sec; }
 // Newest period in a company's figures, and how to describe it
 function latestPeriod(f){ const ry=(f.rev_y||f.ni_y||[]).filter(p=>p&&p.p), lastFY=ry.length?ry[ry.length-1].p:null;
-  const d=fromEpoch(f.mostRecentQuarter), mq=d?d.toISOString().slice(0,7):null;
+  const d=fromEpoch(f.mostRecentQuarter); let mq=d?d.toISOString().slice(0,7):null;
+  const ep=f.ep&&f.ep.ok&&f.ep.rows&&f.ep.rows.length?f.ep.rows[f.ep.rows.length-1].p.slice(0,7):null; if(ep&&(!mq||ep>mq)) mq=ep;
   const endOf=ym=>{ const [y,m]=ym.split("-").map(Number); return new Date(Date.UTC(y,m,0)); };
   const fmt=dt=>dt.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"2-digit",timeZone:"UTC"});
   if(mq&&(!lastFY||mq>lastFY)){ const months=lastFY?(+mq.slice(0,4)-+lastFY.slice(0,4))*12+(+mq.slice(5)-+lastFY.slice(5)):null;
@@ -1608,6 +1634,7 @@ function renderCompany(code){
     const ex=fromEpoch(f.exDividendDate), er=fromEpoch(f.earningsTimestampStart), today=new Date(M.marketDate+"T00:00:00");
     if(ex&&ex>=today) kf.push(["Next ex-dividend",dayLabel(ex)]); if(er&&er>=today) kf.push(["Next results",dayLabel(er)]);
     R.append(el("section",{class:"panel"},el("h2",{text:"Key figures"}),el("div",{class:"kfig"},...kf.map(([k,v])=>el("div",null,el("div",{class:"k",text:k}),el("div",{class:"v",text:v}))))));
+    const hp=M.id==="AU"?halfPanel(f):null; if(hp) R.append(hp);
     const fxNote=isNum(f.fx)&&f.fx!==1&&f.fin_ccy?` (${f.fin_ccy})`:"";
     const fh=el("section",{class:"panel"},el("h2",{text:"Financial health"+fxNote}));
     [["Revenue",f.rev_y,"rev"],["Net income",f.ni_y,"ni"],["Free cash flow",f.fcf_y,null],["Total debt",f.debt_y,"debt"]].forEach(([t,s,k])=>{ const h=el("div"); fh.append(el("h3",{text:t}),h); const ex=k?latestBar(f,s,k):null; later.push(()=>h.replaceChildren(barChart(s,Math.max(220,h.clientWidth),t,ex))); });
@@ -1627,7 +1654,7 @@ function renderCompany(code){
       el("td",{class:"num",text:isNum(x.m.ndEbitda)?(x.m.ndEbitda<0?"Net cash":num(x.m.ndEbitda,1)+"×"):"—"}),el("td",{class:"num",text:bb?`${bb.passed} of ${bb.evaluated}`:"—"}),el("td",{class:"num"},chgNode(x.r.traded?x.r.chg:null)))); });
     t.append(tb); host.append(el("section",{class:"panel"},el("h2",{text:"Against its peers"}),el("p",{class:"note",text:`Closest in size within ${ps[0].r.group===r.group?r.group:r.sector}.`}),el("div",{class:"tblwrap"},t))); } }
   host.append(links(r,f));
-  host.append(el("p",{class:"note",text:"Figures from Yahoo Finance"+(f?`, fetched ${f.fetched}`:"")+(M.id==="AU"?"; announcements and halts from the ASX":"")+". They describe the numbers; they aren't buy or sell advice."}));
+  host.append(el("p",{class:"note",text:"Figures from Yahoo Finance"+(f?`, fetched ${f.fetched}`:"")+(f&&f.ep?"; half-years from Eulerpool":"")+(M.id==="AU"?"; announcements and halts from the ASX":"")+". They describe the numbers; they aren't buy or sell advice."}));
   requestAnimationFrame(()=>later.forEach(fn=>fn()));
 }
 

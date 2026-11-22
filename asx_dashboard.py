@@ -1056,6 +1056,13 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
     rstate = merge_results(rstate, events, day)
     force = results_due(rstate, day)
     fund, fstats = ({}, None) if args.no_fundamentals else gather_fundamentals(m, cfg, watch, args.fundamentals_full, gentle, force)
+    if fund and mkt == "AU" and not args.no_fundamentals:
+        try:
+            epm = float(os.environ.get("EP_MINUTES", "25"))
+            for c, v in gather_eulerpool(list(fund), fund, set(force), epm).items():
+                fund[c]["ep"] = v
+        except Exception as e:  # noqa: BLE001
+            log(f"  Eulerpool skipped: {e}")
     if fund:
         rstate = check_results(rstate, fund, day)
         save_results(mkt, rstate)
@@ -1079,6 +1086,178 @@ def build_market(mkt: str, args, watch: set[str]) -> dict:
         except Exception as e:  # noqa: BLE001
             log(f"  ASX announcements skipped: {e}")
     return payload
+
+
+# ------------------------------------------------ Eulerpool ASX half-years ---
+# Yahoo has no half-year profit and loss for ASX companies. Eulerpool's free API does, but our
+# tests found some companies wrong or months out of date, so every figure is cross-checked:
+# halves must add up to the full year, and full years are compared with Yahoo's.
+EP_BASE = "https://api.eulerpool.com/api/1/equity"
+EP_DIR = CACHE / "eulerpool"
+EP_TTL_DAYS = 14
+EP_TOL_SUM = 0.03       # two halves within 3% of the full-year total
+EP_TOL_SOURCES = 0.05   # Eulerpool and Yahoo full years within 5%
+
+
+def _ep_key() -> str:
+    return os.environ.get("EULERPOOL_API_KEY", "").strip()
+
+
+def _ep_get(session, path: str, params: dict | None = None):
+    p = dict(params or {})
+    p["token"] = _ep_key()
+    r = session.get(f"{EP_BASE}/{path}", params=p, timeout=45)
+    if r.status_code == 429:
+        raise RateLimited("Eulerpool rate limit")
+    if r.status_code in (401, 402, 403):
+        raise PermissionError(f"Eulerpool refused ({r.status_code})")
+    r.raise_for_status()
+    time.sleep(0.4)
+    return r.json()
+
+
+def _ep_isin(session, code: str, isins: dict) -> str | None:
+    if code in isins:
+        return isins[code]
+    j = _ep_get(session, "search", {"q": f"{code}.AX"})
+    rows = j.get("results") if isinstance(j, dict) else j
+    isin = None
+    for r in rows or []:
+        if isinstance(r, dict) and str(r.get("ticker", "")).upper() == f"{code}.AX":
+            isin = r.get("isin")
+            break
+    isins[code] = isin                      # remember misses too, so they aren't searched daily
+    return isin
+
+
+def _ep_rows(j) -> list[dict]:
+    """Reported periods only: no analyst estimates (period ends in "e") and no empty placeholder rows."""
+    out = []
+    for r in j if isinstance(j, list) else []:
+        p = str(r.get("period") or "")
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", p):
+            continue
+        out.append(r)
+    return sorted(out, key=lambda r: r["period"])
+
+
+def fetch_eulerpool(session, isin: str) -> dict:
+    iq = _ep_rows(_ep_get(session, f"income-statement-quarterly/{isin}"))
+    cq = {r["period"]: r for r in _ep_rows(_ep_get(session, f"cashflow-statement-quarterly/{isin}"))}
+    bq = {r["period"]: r for r in _ep_rows(_ep_get(session, f"balance-sheet-quarterly/{isin}"))}
+    ia = _ep_rows(_ep_get(session, f"incomestatement/{isin}"))
+    prof = _ep_get(session, f"profile/{isin}")
+    halves = []
+    for r in iq[-10:]:
+        rev, ni = fnum(r.get("revenue"), 3), fnum(r.get("netIncome"), 3)
+        if not rev and not ni:
+            continue                        # placeholder rows with zeros
+        cf, bs = cq.get(r["period"], {}), bq.get(r["period"], {})
+        halves.append({"p": r["period"], "rev": rev, "ni": ni, "ocf": fnum(cf.get("netOperatingCashFlow"), 3),
+                       "cash": fnum(bs.get("cash"), 3), "debt": fnum(bs.get("totalDebt"), 3)})
+    years = [{"p": r["period"], "rev": fnum(r.get("revenue"), 3), "ni": fnum(r.get("netIncome"), 3)} for r in ia[-4:]]
+    return {"fetched": datetime.now().strftime("%Y-%m-%d"), "isin": isin,
+            "ccy": (prof or {}).get("currency") if isinstance(prof, dict) else None, "halves": halves, "years": years}
+
+
+def _months_before(p: str, n: int) -> str:
+    return (pd.Period(p[:7], "M") - n).strftime("%Y-%m")
+
+
+def check_eulerpool(ep: dict, f: dict | None) -> dict:
+    """Decide which Eulerpool figures can be shown. Returns a compact record for the page."""
+    halves = {h["p"][:7]: h for h in ep.get("halves") or []}
+    years = ep.get("years") or []
+    checks = []
+    for y in years[-3:]:
+        ym = y["p"][:7]
+        h2, h1 = halves.get(ym), halves.get(_months_before(ym, 6))
+        if not (h1 and h2):
+            continue
+        for key in ("rev", "ni"):
+            tot = y.get(key)
+            a, b = h1.get(key), h2.get(key)
+            if tot is None or a is None or b is None or abs(tot) < 1e-9:
+                continue
+            checks.append(abs(a + b - tot) / abs(tot) <= EP_TOL_SUM)
+            break
+    ok = bool(checks) and checks[-1]       # the most recent full year must add up
+    # Compare full years with Yahoo's
+    disagree = None
+    yf_rev = {p["p"]: p["v"] for p in (f or {}).get("rev_y") or [] if p.get("v") is not None}
+    for y in reversed(years):
+        ym, v = y["p"][:7], y.get("rev")
+        if ym in yf_rev and v:
+            yv = yf_rev[ym] / 1e6
+            if yv and abs(v - yv) / max(abs(v), abs(yv)) > EP_TOL_SOURCES:
+                disagree = {"p": ym, "ep": v, "yf": round(yv, 3)}
+            break
+    ep_last = max([h["p"] for h in ep.get("halves") or []] + [y["p"] for y in years] or [""])[:7]
+    yf_last = (fund_period_end(f) or "")[:7] if f else ""
+    rows = [h for h in sorted(halves.values(), key=lambda h: h["p"])][-5:] if ok else []
+    return {"ok": ok, "checked": len(checks), "rows": rows, "ccy": ep.get("ccy"), "fetched": ep.get("fetched"),
+            "disagree": disagree, "behind": bool(yf_last and ep_last and ep_last < yf_last),
+            "newer": bool(ok and yf_last and rows and rows[-1]["p"][:7] > yf_last)}
+
+
+def gather_eulerpool(codes: list[str], fund: dict, force: set[str], minutes: float) -> dict:
+    """Fetch (time-limited) and cross-check Eulerpool half-years for ASX companies with financials."""
+    if not _ep_key():
+        return {}
+    import requests
+
+    EP_DIR.mkdir(parents=True, exist_ok=True)
+    fi = EP_DIR / "_isin.json"
+    try:
+        isins = json.loads(fi.read_text())
+    except Exception:  # noqa: BLE001
+        isins = {}
+    have, need = {}, []
+    for c in codes:
+        fp = EP_DIR / f"{c}.json"
+        d = None
+        if fp.exists():
+            try:
+                d = json.loads(fp.read_text())
+            except Exception:  # noqa: BLE001
+                d = None
+        if d:
+            have[c] = d
+        age = (time.time() - fp.stat().st_mtime) / 86400 if fp.exists() else 1e9
+        if not d or age > EP_TTL_DAYS or (c in force and age > 0.5):
+            need.append(c)
+    need.sort(key=lambda c: (c not in force, c in have))
+    s, t_end, got, failed = requests.Session(), time.time() + minutes * 60, 0, 0
+    for c in need:
+        if time.time() > t_end:
+            log(f"  Eulerpool: time limit reached after {got}; the rest come on the next runs")
+            break
+        try:
+            isin = _ep_isin(s, c, isins)
+            if not isin:
+                continue
+            d = fetch_eulerpool(s, isin)
+            (EP_DIR / f"{c}.json").write_text(json.dumps(d))
+            have[c] = d
+            got += 1
+        except (RateLimited, PermissionError) as e:
+            log(f"  Eulerpool stopped: {e}")
+            break
+        except Exception as e:  # noqa: BLE001
+            failed += 1
+            if failed <= 5:
+                log(f"  Eulerpool {c}: {e}")
+    fi.write_text(json.dumps(isins))
+    out = {c: check_eulerpool(d, fund.get(c)) for c, d in have.items() if c in fund}
+    for c in os.environ.get("EP_LOG_CODES", "BHP,CBA,WTC,PLS,SFR,AIS,29M,A1M,CXO,ZIP").split(","):
+        v = out.get(c.strip())
+        if v:
+            last = v["rows"][-1]["p"] if v["rows"] else "-"
+            log(f"    {c}: {'pass' if v['ok'] else 'hidden'}, latest half {last}, behind={v['behind']}, newer={v['newer']}, disagree={v['disagree']}")
+    ok = sum(v["ok"] for v in out.values())
+    log(f"  Eulerpool: {got} fetched this run, {len(out)} on file, {ok} pass the half-year checks, "
+        f"{sum(bool(v['disagree']) for v in out.values())} disagree with Yahoo")
+    return out
 
 
 # ------------------------------------------------ results-triggered refresh ---
@@ -1120,6 +1299,9 @@ def results_due(state: dict, today: str) -> dict[str, str]:
 def fund_period_end(d: dict) -> str | None:
     """End date (YYYY-MM-DD) of the newest period in a company's saved financials."""
     ends = []
+    ep = d.get("ep") or {}
+    if ep.get("ok") and ep.get("rows"):
+        ends.append(ep["rows"][-1]["p"])
     mrq = d.get("mostRecentQuarter")
     if isinstance(mrq, (int, float)) and mrq > 0:
         ends.append(datetime.fromtimestamp(mrq, timezone.utc).strftime("%Y-%m-%d"))
@@ -1385,6 +1567,19 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
             e["updatedOn"] = today
         ev.append(e)
     payload["results"] = ev
+    if mkt == "AU":   # Eulerpool half-years: one good, one that fails the check, one with a source disagreement
+        for i, c in enumerate(list(fund)[:30]):
+            f = fund[c]; ry = f.get("rev_y") or []
+            if len(ry) < 2:
+                continue
+            last = ry[-1]["v"] / 1e6
+            rows = []
+            for j, p in enumerate(["2024-12-31", "2025-06-30", "2025-12-31", "2026-06-30"]):
+                v = last * (0.45 + 0.04 * j) * (1.6 if (i % 3 == 1 and j == 1) else 1)
+                rows.append({"p": p, "rev": round(v, 1), "ni": round(v * 0.12, 1), "ocf": round(v * 0.18, 1), "cash": None, "debt": None})
+            f["ep"] = {"ok": i % 3 != 1, "checked": 2, "rows": rows if i % 3 != 1 else [], "ccy": "AUD", "fetched": today,
+                       "disagree": {"p": ry[-1]["p"], "ep": round(last * 1.26, 1), "yf": round(last, 1)} if i % 3 == 2 else None,
+                       "behind": False, "newer": i % 3 == 0}
     return payload
 
 
