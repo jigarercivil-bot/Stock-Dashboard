@@ -434,7 +434,8 @@ INFO_FIELDS = ["trailingPE", "forwardPE", "priceToBook", "trailingEps", "forward
                "returnOnEquity", "returnOnAssets", "currentRatio", "quickRatio", "debtToEquity",
                "trailingAnnualDividendYield", "dividendYield", "payoutRatio", "trailingPegRatio",
                "targetMeanPrice", "numberOfAnalystOpinions", "heldPercentInsiders", "sharesOutstanding", "beta",
-               "exDividendDate", "lastDividendValue", "dividendRate", "earningsTimestampStart"]
+               "exDividendDate", "lastDividendValue", "dividendRate", "earningsTimestampStart",
+               "mostRecentQuarter"]
 
 
 class RateLimited(Exception):
@@ -1161,6 +1162,7 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
             f["exDividendDate"], f["lastDividendValue"] = ts + 86400 * (i % 5), round(rng.uniform(0.05, 1.2), 3)
         if i % 37 == 0:
             f["earningsTimestampStart"] = ts + 86400 * (i % 4)
+        f["mostRecentQuarter"] = int(pd.Timestamp("2025-12-31").timestamp())
     if mkt == "US":
         picks = m.sort_values("mcap", ascending=False).head(45)
         w = [rng.uniform(0.2, 1) ** 3 for _ in range(len(picks))]

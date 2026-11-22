@@ -182,6 +182,7 @@ dialog::backdrop{background:rgba(5,9,18,.62);backdrop-filter:blur(3px)}
 .syncwrap.compact .lg{display:none} .syncwrap.compact .sm{display:inline}
 .viewcount{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 13px;font-size:13px;font-weight:600;color:var(--text-2)}
 .viewcount[hidden]{display:none!important}
+.momtag{font-weight:700;font-size:12.5px;white-space:nowrap}
 .sm{display:none}
 @media (max-width:640px){
   .topline{gap:8px}
@@ -907,9 +908,9 @@ const METRICS={
   pb:{label:"Price to book",dir:-1,fmt:x=>num(x,2),p:"v"},
   fcfY:{label:"Free cash flow yield",dir:1,fmt:P1,p:"v"},
   evSales:{label:"EV / sales",dir:-1,fmt:x=>num(x,2),p:"v"},
-  revG:{label:"Revenue growth, latest year",dir:1,fmt:P1,p:"g"},
+  revG:{label:"Revenue growth, latest results",dir:1,fmt:P1,p:"g"},
   revCagr:{label:"Revenue growth a year, multi-year",dir:1,fmt:P1,p:"g"},
-  epsG:{label:"Earnings growth",dir:1,fmt:P1,p:"g"},
+  epsG:{label:"Earnings growth, latest results",dir:1,fmt:P1,p:"g"},
   roe:{label:"Return on equity",dir:1,fmt:P1,p:"q"},
   roa:{label:"Return on assets",dir:1,fmt:P1,p:"q"},
   om:{label:"Operating margin",dir:1,fmt:P1,p:"q"},
@@ -936,7 +937,7 @@ const VF_NUM=[ // id, label, metric, kind, scale
   ["minROE","Min return on equity, %","roe","min",100],["maxDE","Max debt to equity, %","de","max",1],["minNetCash","Min net cash, % of market cap","netCash","min",100],
   ["minF","Min F-score (0–9)","fscore","min",1],["maxOffHi","At least this % below 52-week high","offhi","off",1],
   ["minDiv","Min dividend yield, %","divY","min",100],["maxPayout","Max payout ratio, %","payout","max",100],["minM3","Min 3-month return, %","m3","rmin",1]];
-const VF_BOOL=[["profit","Profitable only"],["fcfPos","Positive free cash flow"],["noRed","No red flags"]];
+const VF_BOOL=[["profit","Profitable only"],["fcfPos","Positive free cash flow"],["improving","Latest results improving"],["noRed","No red flags"]];
 const defaultVF=()=>({preset:"balanced",w:{...PRESETS[0].w},f:{},rel:"sector",page:0,sortKey:"score",sortDir:-1});
 
 function fm(r){
@@ -956,7 +957,7 @@ function fm(r){
   m.evSales=isNum(ev)&&isNum(rev)&&rev>0?ev/rev:null;
   m.fcfY=isNum(fcf)&&isNum(cap)&&cap>0?fcf/cap:null;
   m.divY=isNum(f.trailingAnnualDividendYield)?f.trailingAnnualDividendYield:(isNum(f.dividendYield)?(f.dividendYield>0.3?f.dividendYield/100:f.dividendYield):null);
-  m.revG=f.revenueGrowth; m.epsG=f.earningsGrowth;
+  m.revG=f.revenueGrowth; m.epsG=f.earningsGrowth; m.mom=momentum(m);
   const ry=(f.rev_y||[]).filter(p=>isNum(p.v)&&p.v>0);
   m.revCagr=ry.length>=3?Math.pow(ry[ry.length-1].v/ry[0].v,1/(ry.length-1))-1:null; m.revYears=ry.length-1;
   m.roe=f.returnOnEquity; m.roa=f.returnOnAssets; m.gm=f.grossMargins; m.om=f.operatingMargins; m.pm=f.profitMargins;
@@ -972,11 +973,20 @@ function fm(r){
   ["pe","fpe","pb","evEbitda","evSales"].forEach(key=>{ if(isNum(m[key])&&m[key]>1000) m[key]=null; });
   return m;
 }
+// Latest results against a year earlier: 1 improving, -1 weakening, 0 steady, null unknown
+function momentum(m){ const r=isNum(m.revG)?m.revG:null, e=isNum(m.epsG)&&Math.abs(m.epsG)<=5?m.epsG:null;
+  if(r==null&&e==null) return null;
+  if((r==null||r>=0.05)&&(e!=null?e>=0.1:r>=0.1)) return 1;
+  if((r!=null&&r<=-0.05&&(e==null||e<=0.05))||(e!=null&&e<=-0.25&&(r==null||r<0.05))) return -1;
+  return 0; }
+function momText(m){ const r=isNum(m.revG)?m.revG:null, e=isNum(m.epsG)&&Math.abs(m.epsG)<=5?m.epsG:null, p=x=>pct(x*100,0);
+  return [r!=null?`revenue ${p(r)}`:"", e!=null?`earnings ${p(e)}`:""].filter(Boolean).join(", "); }
+const MOM={1:"Improving",0:"Steady","-1":"Weakening"};
 function flagsFor(m,ps,r){
   const red=[],green=[];
   if(m.loss) red.push("Loss-making over the last 12 months");
   if(isNum(m.fcf)&&m.fcf<0) red.push("Burning cash: free cash flow is negative");
-  if(isNum(m.revG)&&m.revG<-0.05) red.push(`Revenue down ${pct(Math.abs(m.revG)*100,0).slice(1)} on a year ago`);
+  if(m.mom===-1) red.push(`Latest results weaker than a year earlier: ${momText(m)}`);
   if(isNum(m.revCagr)&&m.revCagr<0&&m.revYears>=2) red.push(`Revenue has shrunk over ${m.revYears} years`);
   if(isNum(m.de)&&m.de>200) red.push(`Heavy debt: ${num(m.de/100,1)}× equity`);
   if(isNum(m.ndEbitda)&&m.ndEbitda>4) red.push(`Net debt is ${num(m.ndEbitda,1)}× EBITDA`);
@@ -987,7 +997,7 @@ function flagsFor(m,ps,r){
   if(isNum(m.fcfY)&&m.fcfY>=0.08) green.push(`Strong cash generation: ${pct(m.fcfY*100,1).slice(1)} free cash flow yield`);
   if(isNum(m.fscore)&&m.fmax>=6&&m.fscore>=7) green.push(`Strong Piotroski score (${m.fscore} of ${m.fmax})`);
   if(isNum(m.roe)&&m.roe>=0.2) green.push(`High return on equity (${pct(m.roe*100,0).slice(1)})`);
-  if(isNum(m.revG)&&m.revG>=0.2) green.push(`Revenue up ${pct(m.revG*100,0).slice(1)} on a year ago`);
+  if(m.mom===1) green.push(`Latest results better than a year earlier: ${momText(m)}`);
   if(r&&isNum(r.offhi)&&r.offhi<=-40&&!m.loss) green.push(`Profitable and ${pct(Math.abs(r.offhi),0).slice(1)} below its 52-week high`);
   return {red,green};
 }
@@ -1022,6 +1032,7 @@ function passes(it){ const f=S.vf.f, m=it.m;
     if(kind==="max"&&!(x<=lim&&x>=0)) return false; if(kind==="min"&&!(x>=lim)) return false; }
   if(f.profit&&m.loss!==false) return false;
   if(f.fcfPos&&!(isNum(m.fcf)&&m.fcf>0)) return false;
+  if(f.improving&&m.mom!==1) return false;
   if(f.noRed&&it.fl.red.length) return false;
   return true; }
 const scColor=v=>isNum(v)?`color-mix(in oklab, var(--brass) ${Math.round(8+v*0.62)}%, transparent)`:"transparent";
@@ -1089,7 +1100,7 @@ function renderScatter(pass){
   host.append(s); }
 
 const VCOLS=[["rank","#","num"],["code","Code"],["name","Company"],["score","Score"],["v","Value","num"],["g","Growth","num"],["q","Quality","num"],["b","Balance","num"],
-  ["pe","P/E","num"],["fcfY","FCF yield","num"],["revG","Revenue growth","num"],["de","Debt / equity","num"],["fscore","F-score","num"],["flags","Flags"]];
+  ["pe","P/E","num"],["fcfY","FCF yield","num"],["revG","Revenue growth","num"],["mom","Latest results"],["de","Debt / equity","num"],["fscore","F-score","num"],["flags","Flags"]];
 function vval(it,k){ if(k==="rank"||k==="score") return it[k]; if("vgqb".includes(k)&&k.length===1) return it.ps[k]; if(k==="code"||k==="name") return it.r[k]; if(k==="offhi") return it.r.offhi; if(k==="flags") return it.fl.red.length; return it.m[k]; }
 function renderVTable(pass){
   const k=S.vf.sortKey,d=S.vf.sortDir;
@@ -1111,7 +1122,9 @@ function renderVTable(pass){
       el("td",null,el("div",{class:"scorecell"},el("b",{text:Math.round(it.score)}),el("div",{class:"scorebar"},el("i",{style:`width:${it.score}%`})))),
       el("td",{class:"num"},scChip(it.ps.v)), el("td",{class:"num"},scChip(it.ps.g)), el("td",{class:"num"},scChip(it.ps.q)), el("td",{class:"num"},scChip(it.ps.b)),
       el("td",{class:"num",text:m.loss?"Loss":fmtM("pe",m.pe)}), el("td",{class:"num "+cls(m.fcfY),text:fmtM("fcfY",m.fcfY)}),
-      el("td",{class:"num "+cls(m.revG),text:fmtM("revG",m.revG)}), el("td",{class:"num",text:fmtM("de",m.de)}),
+      el("td",{class:"num "+cls(m.revG),text:fmtM("revG",m.revG)}),
+      el("td",{title:momText(m)},m.mom==null?"—":el("span",{class:"momtag "+(m.mom>0?"up":m.mom<0?"down":"mut")},m.mom>0?"▲ ":m.mom<0?"▼ ":"",MOM[m.mom])),
+      el("td",{class:"num",text:fmtM("de",m.de)}),
       el("td",{class:"num",text:isNum(m.fscore)?`${m.fscore} of ${m.fmax}`:"—"}), ftd)); });
   t.append(tb); $("vtable").replaceChildren(t);
   const p=$("vpager"); p.replaceChildren(); const prev=el("button",{class:"iconbtn",text:"Previous"}), next=el("button",{class:"iconbtn",text:"Next"});
@@ -1122,7 +1135,7 @@ function renderMethod(){ const h=$("method"); if(h.childElementCount) return;
   const P=(t)=>el("p",{text:t}), H=(t)=>el("h4",{text:t});
   h.append(P("Every stock with fundamentals gets four scores from 0 to 100. Each measure is ranked against its sector (or the whole market, if you switch that), so a score of 80 means the stock beats 80% of its peers on that measure. A pillar's score is the average of its measures; the overall score weights the four pillars by your sliders."),
     H("Value"), P("P/E, EV/EBITDA, price to book, free cash flow yield and EV/sales, all using today's price. Loss-making companies score zero on P/E, and negative EBITDA scores zero on EV/EBITDA."),
-    H("Growth"), P("Revenue growth in the latest year, revenue growth per year over up to four years, and earnings growth."),
+    H("Growth"), P("Revenue and earnings growth in the latest reported results against the same period a year earlier (a half-year for most ASX companies, a quarter for US companies), plus revenue growth per year over up to four years."),
     H("Quality"), P("Return on equity, return on assets, operating margin and gross margin."),
     H("Balance sheet"), P("Debt to equity, net debt to EBITDA, current ratio, net cash as a share of market cap, and the Piotroski F-score: nine pass/fail checks on profitability, debt, liquidity and efficiency from the last two annual reports."),
     H("Red flags"), P("Losses, negative free cash flow, falling revenue, heavy debt, a current ratio under 1, a weak F-score, or a cheap-looking stock whose business is shrinking (a classic value trap)."),
@@ -1496,6 +1509,7 @@ function renderCompany(code){
       dial("Value",pc("v"),isNum(pc("v"))?`Cheaper than ${pc("v")}% of ${rel}`:"Not enough data"),dial("Growth",pc("g"),isNum(pc("g"))?`Faster than ${pc("g")}% of ${rel}`:"Not enough data"),
       dial("Quality",pc("q"),isNum(pc("q"))?`More profitable than ${pc("q")}% of ${rel}`:"Not enough data"),dial("Balance sheet",pc("b"),isNum(pc("b"))?`Stronger than ${pc("b")}% of ${rel}`:"Not enough data"),
       el("div",{class:"dial-side"},b&&b.evaluated>=4?el("span",{class:"pill gold",text:`Buffett-style: ${b.passed} of ${b.evaluated} checks`}):null,
+        mm&&mm.mom===1?el("span",{class:"pill greenp",title:momText(mm),text:"Latest results improving"}):mm&&mm.mom===-1?el("span",{class:"pill redp",title:momText(mm),text:"Latest results weakening"}):null,
         it.fl.red.length?el("span",{class:"pill redp",text:`${it.fl.red.length} red flag${it.fl.red.length>1?"s":""}`}):el("span",{class:"pill greenp",text:"No red flags"}),
         isNum(it.score)?el("span",{class:"note",text:`Discover score ${Math.round(it.score)} with your current weights`}):null))); }
   const grid=el("div",{class:"cgrid"}), L=el("div",{class:"ccol"}), R=el("div",{class:"ccol"}); grid.append(L,R); host.append(grid);
@@ -1529,6 +1543,8 @@ function renderCompany(code){
       ["Free cash flow yield",mm&&isNum(mm.fcfY)?pc1(mm.fcfY):"—"],["Dividend yield",mm&&isNum(mm.divY)?pc1(mm.divY):"—"],["Market cap",money(r.mcap)],["Revenue, 12 months",money(mm?mm.rev:f.totalRevenue)],
       ["Net debt",isNum(debt)&&isNum(cash)?(debt-cash<0?"Net cash "+money(cash-debt):money(debt-cash)):"—"],["Debt to equity",mm&&isNum(mm.de)?num(mm.de,0)+"%":"—"],
       ["Return on equity",isNum(f.returnOnEquity)?pc1(f.returnOnEquity):"—"],["Operating margin",isNum(f.operatingMargins)?pc1(f.operatingMargins):"—"]];
+    if(mm&&mm.mom!=null) kf.push(["Latest results vs a year earlier",momText(mm)||"—"]);
+    const bsd=fromEpoch(f.mostRecentQuarter); if(bsd) kf.push(["Debt and cash as at",fmtDate(bsd.toISOString().slice(0,10),{day:"numeric",month:"short",year:"numeric"})]);
     const ex=fromEpoch(f.exDividendDate), er=fromEpoch(f.earningsTimestampStart), today=new Date(M.marketDate+"T00:00:00");
     if(ex&&ex>=today) kf.push(["Next ex-dividend",dayLabel(ex)]); if(er&&er>=today) kf.push(["Next results",dayLabel(er)]);
     R.append(el("section",{class:"panel"},el("h2",{text:"Key figures"}),el("div",{class:"kfig"},...kf.map(([k,v])=>el("div",null,el("div",{class:"k",text:k}),el("div",{class:"v",text:v}))))));
