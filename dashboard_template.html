@@ -598,8 +598,11 @@ const D = /*__DATA__*/null;
   const base=`https://${site}.goatcounter.com`;
   const sc=document.createElement("script"); sc.async=true; sc.src="https://gc.zgo.at/count.js";
   sc.dataset.goatcounter=base+"/count"; document.head.appendChild(sc);
-  fetch(base+"/counter/TOTAL.json").then(r=>r.ok?r.json():null).then(j=>{ if(!j||j.count==null) return;
-    const n=String(j.count).replace(/[^0-9]/g,""); if(!n) return;
+  const toN=v=>{ const d=String(v==null?"":v).replace(/[^0-9]/g,""); return d?Number(d):null; };
+  const get=path=>fetch(`${base}/counter/${path}.json`,{cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);
+  Promise.all([get("TOTAL"),get(encodeURIComponent(location.pathname.replace(/\/$/,"")||"/"))]).then(js=>{
+    const vals=js.filter(Boolean).flatMap(j=>[toN(j.count),toN(j.count_unique)]).filter(v=>v!=null); if(!vals.length) return;
+    const n=String(Math.max(...vals));
     document.getElementById("viewnum").textContent=Number(n).toLocaleString("en-AU");
     document.getElementById("viewword").textContent=n==="1"?" visit":" visits";
     document.getElementById("viewcount").hidden=false; if(window.fitSync) fitSync(); }).catch(()=>{}); })();
