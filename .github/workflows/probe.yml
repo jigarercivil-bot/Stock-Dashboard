@@ -1,0 +1,13 @@
+name: Probe (temporary)
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: market-cache-none
+          restore-keys: market-cache-
+      - run: ls cache | head; ls cache/fundamentals | head -5; python3 tools/diag_periods.py
