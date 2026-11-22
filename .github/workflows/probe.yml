@@ -8,6 +8,6 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -q -r requirements.txt
-      - run: python tools/probe_results.py
+      - run: PYTHONPATH=. python tools/probe_results.py
         env:
           SEC_CONTACT: ${{ secrets.SEC_CONTACT }}
