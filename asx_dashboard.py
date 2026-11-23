@@ -1784,6 +1784,8 @@ def main():
     ap.add_argument("--fund-minutes", type=float, default=0,
                     help="gentle mode: fetch fundamentals one at a time for at most this many minutes per market")
     ap.add_argument("--fund-delay", type=float, default=1.5, help="gentle mode: seconds between companies")
+    ap.add_argument("--skip-if-built-within", type=float, default=0, metavar="HOURS",
+                    help="skip a market whose last build is newer than this (backup schedules)")
     args = ap.parse_args()
 
     OUT.mkdir(exist_ok=True)
@@ -1800,7 +1802,13 @@ def main():
     else:
         watch = read_watchlist()
         built = {}
-        for mk in wanted:
+        for mk in list(wanted):
+            prev = load_market(mk) if args.skip_if_built_within else None
+            if prev and prev.get("builtUtc"):
+                age = (datetime.now(timezone.utc) - datetime.fromisoformat(prev["builtUtc"])).total_seconds() / 3600
+                if age < args.skip_if_built_within:
+                    log(f"{mk}: already updated {age:.1f} hours ago; nothing to do")
+                    continue
             try:
                 built[mk] = build_market(mk, args, watch[mk])
                 save_market(built[mk])

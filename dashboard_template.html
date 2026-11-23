@@ -1800,7 +1800,7 @@ $("vclear").onclick=()=>{ S.vf.f={}; markCustom(); S.vf.page=0; renderValueContr
 // ---------- last sync ----------
 // must match .github/workflows/build.yml. ASX: 5pm Sydney time Mon–Fri (whatever the UTC offset);
 // US: 22:17 UTC Sun–Thu (9:17am Sydney Mon–Fri in summer, 8:17am in winter).
-const SCHED={AU:{syd:{h:17,m:0,days:[1,2,3,4,5]}},US:{utc:{h:22,m:17,days:[0,1,2,3,4]}}};
+const SCHED={AU:{syd:{h:17,m:7,days:[1,2,3,4,5]}},US:{utc:{h:22,m:17,days:[0,1,2,3,4]}}};
 const sydParts=d=>{ const p=new Intl.DateTimeFormat("en-AU",{timeZone:"Australia/Sydney",hour:"numeric",minute:"numeric",hourCycle:"h23",weekday:"short"}).formatToParts(d);
   const g=t=>(p.find(x=>x.type===t)||{}).value; return {h:+g("hour"),m:+g("minute"),wd:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(g("weekday"))}; };
 function schedAt(id,now,dir){ const sc=SCHED[id]; if(!sc) return null; const step=dir<0?-1:1;
@@ -1812,7 +1812,7 @@ function schedAt(id,now,dir){ const sc=SCHED[id]; if(!sc) return null; const ste
 function ago(ms){ const m=Math.round(ms/6e4); if(m<60) return m<=1?"just now":`${m} minutes ago`; const h=Math.round(m/60); if(h<48) return `${h} hour${h===1?"":"s"} ago`; return `${Math.round(h/24)} days ago`; }
 function builtAt(m){ return m.builtUtc?new Date(m.builtUtc):(D.generatedUtc?new Date(D.generatedUtc):null); }
 function isStale(m,now){ if(!D.scheduled) return false; const last=schedAt(m.id,now,-1), b=builtAt(m);
-  return !!(last&&b&&now-last>2*36e5&&b<last-36e5); }
+  return !!(last&&b&&now-last>5*36e5&&b<last-36e5); }
 function syncHealth(m){ const st=m.stats||{}, f=st.fund||{}, now=new Date();
   const pr=st.listed?st.priced/st.listed:1;
   if(pr<0.85||(f.tried>10&&f.fetched===0)) return {cls:"bad-dot",label:"problem"};
@@ -1853,7 +1853,7 @@ function renderSync(){
     if(st.listed&&st.priced<st.listed) pop.append(el("div",{class:"note",text:`${(st.listed-st.priced).toLocaleString()} listed codes had no price from Yahoo, usually new listings, delistings or securities it doesn't track.`}));
     if(isStale(m,now)) pop.append(el("div",{class:"warn",text:`The ${short(schedAt(m.id,now,-1))} ${m.name} update hasn't arrived. Check the Actions tab on GitHub, or start a run there with "Run workflow".`})); });
   pop.append(el("div",{class:"note",style:"margin-top:10px",text: D.scheduled
-    ? "The ASX updates at 5pm Sydney time, after its 4pm close, and the US after New York's close (the next Sydney morning), Monday to Friday. GitHub sometimes starts a run up to 30 minutes late. Times are in your local time zone."
+    ? "The ASX updates at 5pm Sydney time, after its 4pm close, and the US after New York's close (the next Sydney morning), Monday to Friday. GitHub often starts runs late, so backup runs follow over the next few hours; the first one to start does the update. Times are in your local time zone."
     : "Built on this computer. Run run_dashboard.bat to update. Times are in your local time zone."}));
 }
 window.fitSync=function(){ const w=document.querySelector(".syncwrap"); if(!w) return; w.classList.remove("compact");
