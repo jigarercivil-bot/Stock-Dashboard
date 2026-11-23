@@ -40,12 +40,16 @@ jobs:
     outputs:
       skip: ${{ steps.gate.outputs.skip }}
     steps:
-      - name: Run the ASX update only at 5pm Sydney time
+      # Picks the ASX schedule that matches Sydney's current UTC offset (06:00 UTC in summer time,
+      # 07:00 UTC in winter). Goes by the schedule, not the clock, so a run GitHub starts late still runs.
+      - name: Run the ASX update for 5pm Sydney time
         id: gate
         run: |
-          if [ "${{ github.event.schedule }}" = "0 6 * * 1-5" ] || [ "${{ github.event.schedule }}" = "0 7 * * 1-5" ]; then
-            h=$(TZ=Australia/Sydney date +%H)
-            if [ "$h" != "17" ]; then echo "Sydney time is ${h}:xx, not 5pm: skipping this one"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          sched="${{ github.event.schedule }}"
+          if [ "$sched" = "0 6 * * 1-5" ] || [ "$sched" = "0 7 * * 1-5" ]; then
+            off=$(TZ=Australia/Sydney date +%z)
+            want="0 7 * * 1-5"; [ "$off" = "+1100" ] && want="0 6 * * 1-5"
+            if [ "$sched" != "$want" ]; then echo "Sydney is UTC$off; the other ASX schedule handles today: skipping"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
