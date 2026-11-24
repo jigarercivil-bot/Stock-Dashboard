@@ -1742,6 +1742,27 @@ def mock_market(mkt: str, n: int, seed: int) -> dict:
 
 
 # ------------------------------------------------------------------ output ---
+def last_close_due(mkt: str, now: datetime | None = None) -> datetime:
+    """When the most recent weekday close for a market became ready to collect (UTC)."""
+    from zoneinfo import ZoneInfo
+    tz, hh, mm = (ZoneInfo("Australia/Sydney"), 17, 0) if mkt == "AU" else (ZoneInfo("America/New_York"), 17, 15)
+    now = now or datetime.now(timezone.utc)
+    local = now.astimezone(tz)
+    t = local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if t > local:
+        t -= pd.Timedelta(days=1)
+    while t.weekday() >= 5:
+        t -= pd.Timedelta(days=1)
+    return t.astimezone(timezone.utc)
+
+
+def market_is_due(mkt: str) -> bool:
+    prev = load_market(mkt)
+    if not prev or not prev.get("builtUtc"):
+        return True
+    return datetime.fromisoformat(prev["builtUtc"]) < last_close_due(mkt)
+
+
 def save_market(payload: dict) -> None:
     CACHE.mkdir(exist_ok=True)
     (CACHE / f"market_{payload['id']}.json").write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
@@ -1786,6 +1807,8 @@ def main():
     ap.add_argument("--fund-delay", type=float, default=1.5, help="gentle mode: seconds between companies")
     ap.add_argument("--skip-if-built-within", type=float, default=0, metavar="HOURS",
                     help="skip a market whose last build is newer than this (backup schedules)")
+    ap.add_argument("--auto", action="store_true",
+                    help="update only the markets whose latest close hasn't been collected yet (scheduled runs)")
     args = ap.parse_args()
 
     OUT.mkdir(exist_ok=True)
@@ -1803,6 +1826,9 @@ def main():
         watch = read_watchlist()
         built = {}
         for mk in list(wanted):
+            if args.auto and not market_is_due(mk):
+                log(f"{mk}: latest close already collected; nothing to do")
+                continue
             prev = load_market(mk) if args.skip_if_built_within else None
             if prev and prev.get("builtUtc"):
                 age = (datetime.now(timezone.utc) - datetime.fromisoformat(prev["builtUtc"])).total_seconds() / 3600

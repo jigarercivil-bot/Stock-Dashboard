@@ -2,24 +2,17 @@ name: Build Stock Dashboard
 
 on:
   schedule:
-    # GitHub often starts scheduled runs late and sometimes drops them, so each market has
-    # backup times. The first run to start does the update; later ones see it's done and stop.
-    # ASX: from 5:07pm Sydney Mon–Fri (summer time; an hour later in winter), with backups.
-    - cron: "7 6 * * 1-5"
-    - cron: "37 6 * * 1-5"
-    - cron: "7 7 * * 1-5"
-    - cron: "7 8 * * 1-5"
-    - cron: "7 9 * * 1-5"
-    # US: from 9:17am Sydney Mon–Fri (8:17am in winter), after the New York close, with backups.
-    # Monday morning's run picks up Friday's US close, so nothing runs on a Sydney weekend.
-    - cron: "17 22 * * 0-4"
-    - cron: "47 23 * * 0-4"
-    - cron: "17 1 * * 1-5"
-    - cron: "17 3 * * 1-5"
+    # GitHub often starts scheduled runs hours late or drops them, so there are several.
+    # Each run works out for itself which market's latest close hasn't been collected yet
+    # (ASX after 5pm Sydney, US after 5:15pm New York) and updates only that; otherwise it
+    # stops within a minute.
+    - cron: "7 6,7,8,9,10,12 * * 1-5"
+    - cron: "17 22,23 * * 0-4"
+    - cron: "17 0,1,2,3,5 * * 1-5"
   workflow_dispatch:
     inputs:
       markets:
-        description: "Markets to rebuild (AU, US or AU,US). The other market keeps its last build. 'none' only rebuilds the page (about 2 minutes)."
+        description: "Markets to rebuild (AU, US or AU,US). The other market keeps its last build. 'none' only rebuilds the page (about 2 minutes). 'auto' updates whichever market has a new close."
         default: "AU,US"
         required: false
       fundamentals_full:
@@ -47,23 +40,16 @@ jobs:
     outputs:
       skip: ${{ steps.gate.outputs.skip }}
     steps:
-      # Which market a scheduled run is for, and no ASX update before 5pm Sydney time.
+      # Scheduled runs decide in the build step which markets are due.
       - name: Choose what to update
         id: gate
         run: |
-          sched="${{ github.event.schedule }}"
-          mk="${{ inputs.markets || 'AU,US' }}"
-          if [ -n "$sched" ]; then
-            hr=$(echo "$sched" | awk '{print $2}')
-            if [ "$hr" -ge 6 ] && [ "$hr" -le 9 ]; then
-              mk="AU"
-              h=$(TZ=Australia/Sydney date +%H)
-              if [ "$h" -lt 17 ] && [ "$h" -ge 8 ]; then echo "Sydney time is ${h}:xx, before 5pm: skipping"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-            else
-              mk="US"
-            fi
+          m="${{ inputs.markets || 'AU,US' }}"
+          if [ -n "${{ github.event.schedule }}" ] || [ "$m" = "auto" ]; then
+            echo "markets=AU,US" >> "$GITHUB_OUTPUT"; echo "auto=--auto" >> "$GITHUB_OUTPUT"
+          else
+            echo "markets=$m" >> "$GITHUB_OUTPUT"
           fi
-          echo "markets=$mk" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
@@ -96,12 +82,12 @@ jobs:
           EP_MINUTES: ${{ inputs.fund_minutes && '120' || '25' }}
           SECQ_MINUTES: ${{ inputs.fund_minutes && '150' || '30' }}
           MARKETS: ${{ steps.gate.outputs.markets }}
-          SKIP_FRESH: ${{ github.event.schedule && '10' || '0' }}
+          AUTO: ${{ steps.gate.outputs.auto }}
           FULL: ${{ inputs.fundamentals_full && '--fundamentals-full' || '' }}
           FUND_MINUTES: ${{ inputs.fund_minutes || '40' }}
         # Gentle mode: one company at a time, pauses between, backs off when Yahoo pushes back,
         # and spends at most 40 minutes per market on company financials.
-        run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled --fund-minutes "$FUND_MINUTES" --fund-delay 2 --skip-if-built-within "$SKIP_FRESH"
+        run: python asx_dashboard.py --markets "$MARKETS" $FULL --scheduled --fund-minutes "$FUND_MINUTES" --fund-delay 2 $AUTO
 
       - name: Save data for the next run
         if: always() && steps.gate.outputs.skip != 'true'
