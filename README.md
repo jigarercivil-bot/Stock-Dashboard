@@ -28,8 +28,8 @@ GitHub Pages.
   The portfolio shows value, today's change, gain on cost, scores and what needs attention.
 - **Berkshire** – Berkshire Hathaway's latest 13F holdings with quarterly changes (US).
 
-Search any stock with **Ctrl K**. Mega caps (ASX over A$100B, US over US$200B) are hidden
-from the lists by default and can be switched on under Filters.
+Search any stock with **Ctrl K**. Mega caps (ASX over A$100B, US over US$200B) are shown
+by default along with every other size; any size can be switched off under Filters.
 
 ## How it runs
 

@@ -669,7 +669,7 @@ function hideTip(){ tip.style.opacity=0; }
 const TURN_STEPS={ "A$":[0,20e3,50e3,100e3,500e3,1e6,5e6], "US$":[0,100e3,500e3,1e6,5e6,20e6,100e6] };
 const TURN_DEFAULT={ "A$":100e3, "US$":1e6 };
 const DEFAULT=()=>({ search:"", minTurn:TURN_DEFAULT[CUR]??0, minPrice:0,
-  caps:new Set(CAP_ORDER.filter(c=>c!=="Mega")), sectors:new Set(SECTORS),
+  caps:new Set(CAP_ORDER), sectors:new Set(SECTORS),
   secMetric:S?S.secMetric:"median", mapSize:S?S.mapSize:"mcap", view:S?S.view:"brief", company:null, vf:S?S.vf:defaultVF(), bf:S?S.bf:defaultBF(), capTab:null, bySec:null, byGrp:"", sortKey:"chg", sortDir:-1, page:0 });
 let S=null;
 
@@ -689,7 +689,7 @@ function buildSidebar(){
   CAP_ORDER.forEach(c=>{ if(!counts[c]) return;
     const b=el("button",{class:"chip","aria-pressed":String(S.caps.has(c)),title:capRange(c)+", "+counts[c]+" stocks",text:c});
     b.onclick=()=>{ S.caps.has(c)?S.caps.delete(c):S.caps.add(c); S.page=0; render(); }; caps.append(b); });
-  $("capnote").textContent = M.capBuckets.map(b=>b.name+" "+capRange(b.name)).join("; ")+". Mega caps start switched off.";
+  $("capnote").textContent = M.capBuckets.map(b=>b.name+" "+capRange(b.name)).join("; ")+".";
   const mt=$("minturn"); mt.replaceChildren();
   (TURN_STEPS[CUR]||[0]).forEach(v=>mt.append(el("option",{value:v,text: v? short(v):"Any amount"})));
   if(!(TURN_STEPS[CUR]||[]).includes(S.minTurn)) mt.append(el("option",{value:S.minTurn,text:short(S.minTurn)}));
